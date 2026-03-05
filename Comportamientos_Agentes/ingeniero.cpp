@@ -169,7 +169,7 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_6(Sensores sensores
 
 
 // =========================================================================
-// PRIMITIVAS SENSORIALES-MOTORAS (PROPORCIONADAS - NO MODIFICAR)
+// PRIMITIVAS SENSORIALES-MOTORAS (PROPORCIONADAS)
 // =========================================================================
 
 /**
@@ -191,21 +191,35 @@ void ComportamientoIngeniero::ActualizarMapa(Sensores sensores) {
       break;
     case noreste:
       mapaResultado[sensores.posF - 1][sensores.posC] = sensores.superficie[1];
+      mapaCotas[sensores.posF - 1][sensores.posC] = sensores.cota[1];
       mapaResultado[sensores.posF - 1][sensores.posC + 1] = sensores.superficie[2];
+      mapaCotas[sensores.posF - 1][sensores.posC + 1] = sensores.cota[2];
       mapaResultado[sensores.posF][sensores.posC + 1] = sensores.superficie[3];
+      mapaCotas[sensores.posF][sensores.posC + 1] = sensores.cota[3];
       mapaResultado[sensores.posF - 2][sensores.posC] = sensores.superficie[4];
+      mapaCotas[sensores.posF - 2][sensores.posC] = sensores.cota[4];
       mapaResultado[sensores.posF - 2][sensores.posC + 1] = sensores.superficie[5];
+      mapaCotas[sensores.posF - 2][sensores.posC + 1] = sensores.cota[5];
       mapaResultado[sensores.posF - 2][sensores.posC + 2] = sensores.superficie[6];
+      mapaCotas[sensores.posF - 2][sensores.posC + 2] = sensores.cota[6];
       mapaResultado[sensores.posF - 1][sensores.posC + 2] = sensores.superficie[7];
+      mapaCotas[sensores.posF - 1][sensores.posC + 2] = sensores.cota[7];
       mapaResultado[sensores.posF][sensores.posC + 2] = sensores.superficie[8];
+      mapaCotas[sensores.posF][sensores.posC + 2] = sensores.cota[8];
       mapaResultado[sensores.posF - 3][sensores.posC] = sensores.superficie[9];
+      mapaCotas[sensores.posF - 3][sensores.posC] = sensores.cota[9];
       mapaResultado[sensores.posF - 3][sensores.posC + 1] = sensores.superficie[10];
+      mapaCotas[sensores.posF - 3][sensores.posC + 1] = sensores.cota[10];
       mapaResultado[sensores.posF - 3][sensores.posC + 2] = sensores.superficie[11];
+      mapaCotas[sensores.posF - 3][sensores.posC + 2] = sensores.cota[11];
       mapaResultado[sensores.posF - 3][sensores.posC + 3] = sensores.superficie[12];
+      mapaCotas[sensores.posF - 3][sensores.posC + 3] = sensores.cota[12];
       mapaResultado[sensores.posF - 2][sensores.posC + 3] = sensores.superficie[13];
+      mapaCotas[sensores.posF - 2][sensores.posC + 3] = sensores.cota[13];
       mapaResultado[sensores.posF - 1][sensores.posC + 3] = sensores.superficie[14];
+      mapaCotas[sensores.posF - 1][sensores.posC + 3] = sensores.cota[14];
       mapaResultado[sensores.posF][sensores.posC + 3] = sensores.superficie[15];
-      for (int i=1; i<16; i++) mapaCotas[sensores.posF-(i/4)][sensores.posC+(i%4)] = sensores.cota[i]; // Nota: simplificación de cotas en diagonal
+      mapaCotas[sensores.posF][sensores.posC + 3] = sensores.cota[15];
       break;
     case este:
       for (int j = 1; j < 4; j++)
@@ -216,20 +230,35 @@ void ComportamientoIngeniero::ActualizarMapa(Sensores sensores) {
       break;
     case sureste:
       mapaResultado[sensores.posF][sensores.posC + 1] = sensores.superficie[1];
+      mapaCotas[sensores.posF][sensores.posC + 1] = sensores.cota[1];
       mapaResultado[sensores.posF + 1][sensores.posC + 1] = sensores.superficie[2];
+      mapaCotas[sensores.posF + 1][sensores.posC + 1] = sensores.cota[2];
       mapaResultado[sensores.posF + 1][sensores.posC] = sensores.superficie[3];
+      mapaCotas[sensores.posF + 1][sensores.posC] = sensores.cota[3];
       mapaResultado[sensores.posF][sensores.posC + 2] = sensores.superficie[4];
+      mapaCotas[sensores.posF][sensores.posC + 2] = sensores.cota[4];
       mapaResultado[sensores.posF + 1][sensores.posC + 2] = sensores.superficie[5];
+      mapaCotas[sensores.posF + 1][sensores.posC + 2] = sensores.cota[5];
       mapaResultado[sensores.posF + 2][sensores.posC + 2] = sensores.superficie[6];
+      mapaCotas[sensores.posF + 2][sensores.posC + 2] = sensores.cota[6];
       mapaResultado[sensores.posF + 2][sensores.posC + 1] = sensores.superficie[7];
+      mapaCotas[sensores.posF + 2][sensores.posC + 1] = sensores.cota[7];
       mapaResultado[sensores.posF + 2][sensores.posC] = sensores.superficie[8];
+      mapaCotas[sensores.posF + 2][sensores.posC] = sensores.cota[8];
       mapaResultado[sensores.posF][sensores.posC + 3] = sensores.superficie[9];
+      mapaCotas[sensores.posF][sensores.posC + 3] = sensores.cota[9];
       mapaResultado[sensores.posF + 1][sensores.posC + 3] = sensores.superficie[10];
+      mapaCotas[sensores.posF + 1][sensores.posC + 3] = sensores.cota[10];
       mapaResultado[sensores.posF + 2][sensores.posC + 3] = sensores.superficie[11];
+      mapaCotas[sensores.posF + 2][sensores.posC + 3] = sensores.cota[11];
       mapaResultado[sensores.posF + 3][sensores.posC + 3] = sensores.superficie[12];
+      mapaCotas[sensores.posF + 3][sensores.posC + 3] = sensores.cota[12];
       mapaResultado[sensores.posF + 3][sensores.posC + 2] = sensores.superficie[13];
+      mapaCotas[sensores.posF + 3][sensores.posC + 2] = sensores.cota[13];
       mapaResultado[sensores.posF + 3][sensores.posC + 1] = sensores.superficie[14];
+      mapaCotas[sensores.posF + 3][sensores.posC + 1] = sensores.cota[14];
       mapaResultado[sensores.posF + 3][sensores.posC] = sensores.superficie[15];
+      mapaCotas[sensores.posF + 3][sensores.posC] = sensores.cota[15];
       break;
     case sur:
       for (int j = 1; j < 4; j++)
@@ -240,20 +269,35 @@ void ComportamientoIngeniero::ActualizarMapa(Sensores sensores) {
       break;
     case suroeste:
       mapaResultado[sensores.posF + 1][sensores.posC] = sensores.superficie[1];
+      mapaCotas[sensores.posF + 1][sensores.posC] = sensores.cota[1];
       mapaResultado[sensores.posF + 1][sensores.posC - 1] = sensores.superficie[2];
+      mapaCotas[sensores.posF + 1][sensores.posC - 1] = sensores.cota[2];
       mapaResultado[sensores.posF][sensores.posC - 1] = sensores.superficie[3];
+      mapaCotas[sensores.posF][sensores.posC - 1] = sensores.cota[3];
       mapaResultado[sensores.posF + 2][sensores.posC] = sensores.superficie[4];
+      mapaCotas[sensores.posF + 2][sensores.posC] = sensores.cota[4];
       mapaResultado[sensores.posF + 2][sensores.posC - 1] = sensores.superficie[5];
+      mapaCotas[sensores.posF + 2][sensores.posC - 1] = sensores.cota[5];
       mapaResultado[sensores.posF + 2][sensores.posC - 2] = sensores.superficie[6];
+      mapaCotas[sensores.posF + 2][sensores.posC - 2] = sensores.cota[6];
       mapaResultado[sensores.posF + 1][sensores.posC - 2] = sensores.superficie[7];
+      mapaCotas[sensores.posF + 1][sensores.posC - 2] = sensores.cota[7];
       mapaResultado[sensores.posF][sensores.posC - 2] = sensores.superficie[8];
+      mapaCotas[sensores.posF][sensores.posC - 2] = sensores.cota[8];
       mapaResultado[sensores.posF + 3][sensores.posC] = sensores.superficie[9];
+      mapaCotas[sensores.posF + 3][sensores.posC] = sensores.cota[9];
       mapaResultado[sensores.posF + 3][sensores.posC - 1] = sensores.superficie[10];
+      mapaCotas[sensores.posF + 3][sensores.posC - 1] = sensores.cota[10];
       mapaResultado[sensores.posF + 3][sensores.posC - 2] = sensores.superficie[11];
+      mapaCotas[sensores.posF + 3][sensores.posC - 2] = sensores.cota[11];
       mapaResultado[sensores.posF + 3][sensores.posC - 3] = sensores.superficie[12];
+      mapaCotas[sensores.posF + 3][sensores.posC - 3] = sensores.cota[12];
       mapaResultado[sensores.posF + 2][sensores.posC - 3] = sensores.superficie[13];
+      mapaCotas[sensores.posF + 2][sensores.posC - 3] = sensores.cota[13];
       mapaResultado[sensores.posF + 1][sensores.posC - 3] = sensores.superficie[14];
+      mapaCotas[sensores.posF + 1][sensores.posC - 3] = sensores.cota[14];
       mapaResultado[sensores.posF][sensores.posC - 3] = sensores.superficie[15];
+      mapaCotas[sensores.posF][sensores.posC - 3] = sensores.cota[15];
       break;
     case oeste:
       for (int j = 1; j < 4; j++)
@@ -264,20 +308,35 @@ void ComportamientoIngeniero::ActualizarMapa(Sensores sensores) {
       break;
     case noroeste:
       mapaResultado[sensores.posF][sensores.posC - 1] = sensores.superficie[1];
+      mapaCotas[sensores.posF][sensores.posC - 1] = sensores.cota[1];
       mapaResultado[sensores.posF - 1][sensores.posC - 1] = sensores.superficie[2];
+      mapaCotas[sensores.posF - 1][sensores.posC - 1] = sensores.cota[2];
       mapaResultado[sensores.posF - 1][sensores.posC] = sensores.superficie[3];
+      mapaCotas[sensores.posF - 1][sensores.posC] = sensores.cota[3];
       mapaResultado[sensores.posF][sensores.posC - 2] = sensores.superficie[4];
+      mapaCotas[sensores.posF][sensores.posC - 2] = sensores.cota[4];
       mapaResultado[sensores.posF - 1][sensores.posC - 2] = sensores.superficie[5];
+      mapaCotas[sensores.posF - 1][sensores.posC - 2] = sensores.cota[5];
       mapaResultado[sensores.posF - 2][sensores.posC - 2] = sensores.superficie[6];
+      mapaCotas[sensores.posF - 2][sensores.posC - 2] = sensores.cota[6];
       mapaResultado[sensores.posF - 2][sensores.posC - 1] = sensores.superficie[7];
+      mapaCotas[sensores.posF - 2][sensores.posC - 1] = sensores.cota[7];
       mapaResultado[sensores.posF - 2][sensores.posC] = sensores.superficie[8];
+      mapaCotas[sensores.posF - 2][sensores.posC] = sensores.cota[8];
       mapaResultado[sensores.posF][sensores.posC - 3] = sensores.superficie[9];
+      mapaCotas[sensores.posF][sensores.posC - 3] = sensores.cota[9];
       mapaResultado[sensores.posF - 1][sensores.posC - 3] = sensores.superficie[10];
+      mapaCotas[sensores.posF - 1][sensores.posC - 3] = sensores.cota[10];
       mapaResultado[sensores.posF - 2][sensores.posC - 3] = sensores.superficie[11];
+      mapaCotas[sensores.posF - 2][sensores.posC - 3] = sensores.cota[11];
       mapaResultado[sensores.posF - 3][sensores.posC - 3] = sensores.superficie[12];
+      mapaCotas[sensores.posF - 3][sensores.posC - 3] = sensores.cota[12];
       mapaResultado[sensores.posF - 3][sensores.posC - 2] = sensores.superficie[13];
+      mapaCotas[sensores.posF - 3][sensores.posC - 2] = sensores.cota[13];
       mapaResultado[sensores.posF - 3][sensores.posC - 1] = sensores.superficie[14];
+      mapaCotas[sensores.posF - 3][sensores.posC - 1] = sensores.cota[14];
       mapaResultado[sensores.posF - 3][sensores.posC] = sensores.superficie[15];
+      mapaCotas[sensores.posF - 3][sensores.posC] = sensores.cota[15];
       break;
   }
 }
