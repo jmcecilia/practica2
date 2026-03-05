@@ -493,12 +493,12 @@ static void drawBelPos3D() {
     glDisable(GL_LIGHTING);
     glColor3f(0.05f, 0.05f, 0.07f); // Deep Blackish oil
     glBegin(GL_TRIANGLE_FAN);
-    glVertex3f(0.0f, 0.015f, 0.0f); // Slightly above ground
+    glVertex3f(0.0f, 0.05f, 0.0f); // Slightly above ground
     for (int i = 0; i <= numSegments; i++) {
         float angle = i * 2.0f * 3.14159f / numSegments;
         float ripple = 0.25f * sin(6.0f * t + angle * 4.0f) + 0.12f * cos(10.0f * t - angle * 2.0f);
         float radius = 1.8f + ripple;
-        glVertex3f(radius * cos(angle), 0.015f, radius * sin(angle));
+        glVertex3f(radius * cos(angle), 0.05f, radius * sin(angle));
     }
     glEnd();
     glEnable(GL_LIGHTING);
@@ -1093,29 +1093,63 @@ void Mapa::complementosCelda(unsigned char celda, unsigned char altura, int fil,
     if (mask != 0) {
       static TuboTerminal3D* tuboT = nullptr;
       if (!tuboT) tuboT = new TuboTerminal3D();
+      static VerticalConnector3D* vConn = nullptr;
+      if (!vConn) vConn = new VerticalConnector3D();
 
       // 1: North (+Z), 4: East (-X), 16: South (-Z), 64: West (+X)
       if (mask & 16) { // South (-Z)
         glPushMatrix();
         tuboT->draw(1);
+        if (fil + 1 < pipes3D.size() && pipes3D[fil + 1][col] != 0) {
+            float dh = (float)(mapaAlturas[fil + 1][col] - '0') - (float)(altura - '0');
+            if (dh != 0) {
+                glTranslatef(0.0, 0.0, -2.5);
+                vConn->setConnector(dh * 2.0f);
+                vConn->draw(1);
+            }
+        }
         glPopMatrix();
       }
       if (mask & 4) { // East (-X)
         glPushMatrix();
         glRotatef(90, 0, 1, 0);
         tuboT->draw(1);
+        if (col + 1 < pipes3D[fil].size() && pipes3D[fil][col + 1] != 0) {
+            float dh = (float)(mapaAlturas[fil][col + 1] - '0') - (float)(altura - '0');
+            if (dh != 0) {
+                glTranslatef(0.0, 0.0, -2.5);
+                vConn->setConnector(dh * 2.0f);
+                vConn->draw(1);
+            }
+        }
         glPopMatrix();
       }
       if (mask & 1) { // North (+Z)
         glPushMatrix();
         glRotatef(180, 0, 1, 0);
         tuboT->draw(1);
+        if (fil > 0 && pipes3D[fil - 1][col] != 0) {
+            float dh = (float)(mapaAlturas[fil - 1][col] - '0') - (float)(altura - '0');
+            if (dh != 0) {
+                glTranslatef(0.0, 0.0, -2.5);
+                vConn->setConnector(dh * 2.0f);
+                vConn->draw(1);
+            }
+        }
         glPopMatrix();
       }
       if (mask & 64) { // West (+X)
         glPushMatrix();
         glRotatef(270, 0, 1, 0);
         tuboT->draw(1);
+        if (col > 0 && pipes3D[fil][col - 1] != 0) {
+            float dh = (float)(mapaAlturas[fil][col - 1] - '0') - (float)(altura - '0');
+            if (dh != 0) {
+                glTranslatef(0.0, 0.0, -2.5);
+                vConn->setConnector(dh * 2.0f);
+                vConn->draw(1);
+            }
+        }
         glPopMatrix();
       }
     }
@@ -1440,37 +1474,7 @@ void Mapa::drawMM2(vector<unsigned int> objetivosActivos, int level, bool drawTo
       glTranslatef(((GLfloat)objetivosActivos[i + 1] - (GLfloat)filaMed) * ratio, ((GLfloat)colMed - (GLfloat)objetivosActivos[i]) * ratio, 0);
       glScalef(ratio, ratio, ratio);
       
-      // Draw pipe from above: three concentric circles
-      int numSegments = 20;
-      
-      // Ground base (sendero color - square)
-      glColor3f(0.8, 0.6, 0.3);
-      glBegin(GL_QUADS);
-      glVertex3f(-0.5, -0.5, 0.0);
-      glVertex3f(0.5, -0.5, 0.0);
-      glVertex3f(0.5, 0.5, 0.0);
-      glVertex3f(-0.5, 0.5, 0.0);
-      glEnd();
-      
-      // Middle pipe rim (green)
-        glColor3f(1.0, 0.2, 0.2);
-      glBegin(GL_TRIANGLE_FAN);
-      glVertex3f(0.0, 0.0, 0.2);
-      for (int s = 0; s <= numSegments; s++) {
-        float angle = s * 2.0f * M_PI / numSegments;
-        glVertex3f(0.38f * cos(angle), 0.38f * sin(angle), 0.2);
-      }
-      glEnd();
-      
-      // Inner opening (black)
-      glColor3f(0.0, 0.0, 0.0);
-      glBegin(GL_TRIANGLE_FAN);
-      glVertex3f(0.0, 0.0, 0.3);
-      for (int s = 0; s <= numSegments; s++) {
-        float angle = s * 2.0f * M_PI / numSegments;
-        glVertex3f(0.25f * cos(angle), 0.25f * sin(angle), 0.3);
-      }
-      glEnd();
+      drawBelPos2D();
       glPopMatrix();
     }
   }
