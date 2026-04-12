@@ -28,12 +28,130 @@ Action ComportamientoTecnico::think(Sensores sensores) {
   return accion;
 }
 
+/** 
+ * @brief Función para detectar casillas accesibles.
+ * @param casilla Carácter que representa la casilla a evaluar.
+ * @param dif Diferencia de altura entre la casilla actual y la casilla a evaluar.
+ * @return Un carácter que indica si la casilla es accesible o no.
+ */
+char CasillaAccesibleT(char casilla, int dif){
+  if (!(casilla == 'C' || casilla == 'D' || casilla == 'U'))
+    return 'P';
+
+  if (abs(dif) <= 1 )
+    return casilla;
+
+  return 'P';
+}
+
+Action ComportamientoTecnico::MejorAccion(char i, char c, char d , Sensores sensores)
+{
+// Variable estática para recordar cuántos giros seguidos llevamos (memoria Nivel 0)
+    static int consec_turns = 0;
+
+    //  Maniobras evasivas
+    if (giro45Izq > 0) { 
+        giro45Izq--; 
+        esquinaDer--; 
+        consec_turns = 0; // Al esquivar reseteamos
+        return TURN_SL; 
+    }
+    // Si el otro agente esta enfrente, giramos para esquivarlo
+    if (sensores.agentes[2] == 'i') { 
+        giro45Izq = 1; 
+        esquinaDer--; 
+        consec_turns = 0;
+        return  TURN_SL; 
+    }
+
+    //  Prioridad: Meta
+    if (c == 'U') { consec_turns = 0; return WALK; }
+    if (i == 'U') { esquinaDer--; consec_turns++; return TURN_SL; }
+    if (d == 'U') { esquinaDer++; consec_turns++; return TURN_SR; }
+
+    //  Detecta giros de 360 grados para no quedarse en bucles grandes
+    if (esquinaDer >= 8) {
+        alternar = true;   
+        esquinaDer = 0;
+    } else if (esquinaDer <= -8) {
+        alternar = false;  
+        esquinaDer = 0;
+    }
+
+    bool es_diagonal = (sensores.rumbo % 2 != 0);  // Detecta si se esta mirando a una direccion diagonal
+    bool embudo = es_diagonal && (i == 'P' && d == 'P'); // Detecta si se esta en un embudo (pared a ambos lados)
+
+    Action accion_elegida = IDLE;
+
+    // Movimiento siguiendo los muros dependiendo de la variable alternar, ademas de tener en cuenta los giros de 90 grados para no quedarse en bucles pequeños
+     if (!alternar) {
+        
+        // Da prioridad de movimiento siguiendo el muro derecho
+        if (d != 'P' && consec_turns < 2) {
+            esquinaDer++;
+            accion_elegida = TURN_SR;
+        } else if (c != 'P' && !embudo) {
+            accion_elegida = WALK;
+        } else if (i != 'P') {
+            esquinaDer--;
+            accion_elegida = TURN_SL;
+        } else {
+            esquinaDer--;
+            accion_elegida = TURN_SL; 
+        }
+    } else {
+        // Da prioridad de movimiento siguiendo el muro izquierdo
+        if (i != 'P' && consec_turns < 2) {
+            esquinaDer--;
+            accion_elegida = TURN_SL;
+        } else if (c != 'P' && !embudo) {
+            accion_elegida = WALK;
+        } else if (d != 'P') {
+            esquinaDer++;
+            accion_elegida = TURN_SR;
+        } else {
+            esquinaDer++;
+            accion_elegida = TURN_SR; 
+        }
+    }
+    
+
+    // Actualizar el contador de giros consecutivos
+    if (accion_elegida == WALK) {
+        consec_turns = 0; // Si caminamos, la cuenta vuelve a cero
+    } else {
+        consec_turns++;   // Si giramos, aumentamos la cuenta
+    }
+
+    return accion_elegida;
+}
+
 
 // Niveles del técnico
 Action ComportamientoTecnico::ComportamientoTecnicoNivel_0(Sensores sensores) {
   Action accion = IDLE;
 
+  // Actualizar el mapa interno con la información de los sensores
+  ActualizarMapa(sensores);
+
+  // El agente comienza sin zapatillas, pero si detecta una casilla 'D' delante, las recoge.
+  if (sensores.superficie[0] == 'D') tiene_zapatillas = true;
+
+  // Definicion del comportamiento del agente 
+  if (sensores.superficie[0] == 'U'){ 
+    return IDLE; // Llegamos a la meta
+  }
+
+  char i= CasillaAccesibleT(sensores.superficie[1], sensores.cota[1] - sensores.cota[0]);
+  char c= CasillaAccesibleT(sensores.superficie[2], sensores.cota[2] - sensores.cota[0]);
+  char d= CasillaAccesibleT(sensores.superficie[3], sensores.cota[3] - sensores.cota[0]);
+
+  accion = MejorAccion(i, c, d, sensores);
+
+  // Devolver la accion decidida
+  last_action = accion;
   return accion;
+
 }
 
 /**

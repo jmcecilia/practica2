@@ -33,6 +33,11 @@ public:
    */
   ComportamientoTecnico(unsigned int size = 0) : Comportamiento(size) {
     // Inicializar Variables de Estado
+    last_action = IDLE;
+    tiene_zapatillas = false;
+    giro45Izq = 0;
+    alternar = false;
+    esquinaDer = 0; // (Para detectar esquinas) --- IGNORE ---
   }
 
   /**
@@ -67,7 +72,17 @@ public:
   // =========================================================================
   // ÁREA DE IMPLEMENTACIÓN DEL ESTUDIANTE
   // =========================================================================
-  
+
+  bool PuedeAvanzar(Sensores sensores);
+
+  /**
+   * @brief Función para decidir la mejor acción a tomar según las casillas accesibles.
+   * @param i Carácter que representa la casilla izquierda.
+   * @param c Carácter que representa la casilla central.           
+   * @param d Carácter que representa la casilla derecha.
+   */
+  Action MejorAccion(char i, char c, char d, Sensores sensores);
+
 /**
  * @brief Comportamiento del técnico para el Nivel 0.
  * @param sensores Datos actuales de los sensores.
@@ -188,7 +203,11 @@ private:
   // VARIABLES DE ESTADO (PUEDEN SER EXTENDIDAS POR EL ALUMNO)
   // =========================================================================
 
-  
+  bool tiene_zapatillas;
+  int giro45Izq;
+  Action last_action;
+  bool alternar;            // (Para evitar rebotes en diagonales)
+  int esquinaDer;            // Contador para detectar esquinas a la derecha (no utilizado en esta práctica, pero puede ser útil para niveles avanzados)
 };
 
 #endif

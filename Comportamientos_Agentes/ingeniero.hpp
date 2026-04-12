@@ -21,7 +21,11 @@ public:
    * @param size Tamaño del mapa (si es 0, se inicializa más tarde)
    */
   ComportamientoIngeniero(unsigned int size = 0) : Comportamiento(size) {
-    // Inicializar Variables de Estado
+    last_action = IDLE;
+    tiene_zapatillas = false;
+    giro45Izq = 0;
+    alternar = false;
+    esquinaDer = 0; // (Para detectar esquinas) --- IGNORE ---
   }
 
   /**
@@ -57,7 +61,17 @@ public:
   // ÁREA DE IMPLEMENTACIÓN DEL ESTUDIANTE
   // =========================================================================
 
-  // Funciones específicas para cada nivel (para ser implementadas por el alumno)
+  
+  bool PuedeAvanzar(Sensores sensores, bool zap);
+
+  /**
+   * @brief Función para el pensar el movimiento del ingeniero.
+   * @param casilla Carácter que representa la casilla a evaluar.
+   * @param dif Diferencia de altura entre la casilla actual y la casilla a evaluar.
+   * @param zap Indica si el agente tiene zapatillas.
+   * @return Devuelve la mejor accion posible.
+   */
+  Action MejorAccion(char i, char c, char d, bool tiene_zapatillas, Sensores sensores);
   
   /**
    * @brief Implementación del Nivel 0.
@@ -183,6 +197,12 @@ private:
   // VARIABLES DE ESTADO (PUEDEN SER EXTENDIDAS POR EL ALUMNO)
   // =========================================================================
 
+
+  Action last_action;       // Última acción realizada 
+  bool tiene_zapatillas;    // Indica si el agente posee zapatillas
+  int giro45Izq;            // Contador de giros de 45 grados a la izquierda que pueden darse.
+  bool alternar;
+  int esquinaDer;          // Contador para detectar esquinas (incrementa al girar a la derecha, decrementa al girar a la izquierda)
 };
 
 #endif

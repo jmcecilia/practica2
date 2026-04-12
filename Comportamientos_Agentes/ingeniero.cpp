@@ -42,11 +42,144 @@ Action ComportamientoIngeniero::think(Sensores sensores)
 
   return accion;
 }
+/** 
+ * @brief Función para detectar casillas accesibles.
+ * @param casilla Carácter que representa la casilla a evaluar.
+ * @param dif Diferencia de altura entre la casilla actual y la casilla a evaluar.
+ * @param zap Indica si el agente tiene zapatillas.
+ * @return Un carácter que indica si la casilla es accesible o no.
+ */
+char CasillaAccesibleI(char casilla, int dif, bool zap){
+  if (!(casilla == 'C' || casilla == 'D' || casilla == 'U'))
+    return 'P';
+
+  if (abs(dif) <= 1 || (zap && abs(dif) <= 2))
+    return casilla;
+
+  return 'P';
+}
+
+bool ComportamientoIngeniero::PuedeAvanzar(Sensores sensores, bool zap){
+  char c = CasillaAccesibleI(
+      sensores.superficie[2],
+      sensores.cota[2] - sensores.cota[0],
+      zap
+  );
+
+  return (c != 'P');
+}
+
+
+/**
+ * @brief Función para decidir la mejor acción a tomar según las casillas accesibles.
+ * @param i Carácter que representa la casilla izquierda.
+ * @param c Carácter que representa la casilla central.
+ * @param d Carácter que representa la casilla derecha.
+ * @param tiene_zapatillas Indica si el agente posee zapatillas.
+ * @return La acción recomendada para el agente.
+ */
+Action ComportamientoIngeniero::MejorAccion(char i, char c, char d, bool tiene_zapatillas , Sensores sensores)
+{
+  // Variable estática para recordar cuántos giros seguidos llevamos (memoria Nivel 0)
+    static int consec_turns = 0;
+
+    // Maniobras evasivas
+    if (giro45Izq > 0) { 
+        giro45Izq--; 
+        esquinaDer--; 
+        consec_turns = 0; // Al esquivar reseteamos
+        return TURN_SL; 
+    }
+    // Si el otro agente esta enfrente, giramos para esquivarlo
+    if (sensores.agentes[2] == 't') { 
+        giro45Izq = 1; 
+        esquinaDer--; 
+        consec_turns = 0;
+        return TURN_SL; 
+    }
+
+    //  Prioridad: Meta
+    if (c == 'U') { consec_turns = 0; return WALK; }
+    if (i == 'U') { esquinaDer--; consec_turns++; return TURN_SL; }
+    if (d == 'U') { esquinaDer++; consec_turns++; return TURN_SR; }
+
+    //  Detecta giros de 360 grados para no quedarse en bucles grandes
+    if (esquinaDer >= 8) {
+        alternar = true;   
+        esquinaDer = 0;
+    } else if (esquinaDer <= -8) {
+        alternar = false;  
+        esquinaDer = 0;
+    }
+
+    bool es_diagonalI = (sensores.rumbo % 2 != 0); // Detecta si se esta mirando a una direccion diagonal
+    bool embudoI = es_diagonalI && (i == 'P' && d == 'P'); // Detecta si se esta en un embudo (pared a ambos lados)
+    Action accion_elegida = IDLE;
+
+    // Movimiento siguiendo los muros dependiendo de la variable alternar, ademas de tener en cuenta los giros de 90 grados para no quedarse en bucles pequeños
+    if (!alternar) {
+        
+        // Da prioridad de movimiento siguiendo el muro derecho
+        if (d != 'P' && consec_turns < 2) {
+            esquinaDer++;
+            accion_elegida = TURN_SR;
+        } else if (c != 'P' && !embudoI) {
+            accion_elegida = WALK;
+        } else if (i != 'P') {
+            esquinaDer--;
+            accion_elegida = TURN_SL;
+        } else {
+            esquinaDer--;
+            accion_elegida = TURN_SL; 
+        }
+    } else {
+        // Da prioridad de movimiento siguiendo el muro izquierdo
+        if (i != 'P' && consec_turns < 2) {
+            esquinaDer--;
+            accion_elegida = TURN_SL;
+        } else if (c != 'P' && !embudoI) {
+            accion_elegida = WALK;
+        } else if (d != 'P') {
+            esquinaDer++;
+            accion_elegida = TURN_SR;
+        } else {
+            esquinaDer++;
+            accion_elegida = TURN_SR; 
+        }
+    }
+
+    // Actualizar el contador de giros consecutivos
+    if (accion_elegida == WALK) {
+        consec_turns = 0; // Si caminamos, la cuenta vuelve a cero
+    } else {
+        consec_turns++;   // Si giramos, aumentamos la cuenta
+    }
+
+    return accion_elegida;
+}
+
 
 // Niveles iniciales (Comportamientos reactivos simples)
 Action ComportamientoIngeniero::ComportamientoIngenieroNivel_0(Sensores sensores)
 {
   Action accion = IDLE;
+
+  ActualizarMapa(sensores);
+
+  if (sensores.superficie[0] == 'D') tiene_zapatillas = true;
+
+  if (sensores.superficie[0] == 'U'){ 
+    return IDLE;
+  }
+
+  char i = CasillaAccesibleI(sensores.superficie[1], sensores.cota[1] - sensores.cota[0], tiene_zapatillas);
+  char c = CasillaAccesibleI(sensores.superficie[2], sensores.cota[2] - sensores.cota[0], tiene_zapatillas);
+  char d = CasillaAccesibleI(sensores.superficie[3], sensores.cota[3] - sensores.cota[0], tiene_zapatillas);
+
+
+  accion = MejorAccion(i, c, d, tiene_zapatillas, sensores);
+
+  last_action = accion;
   return accion;
 }
 
