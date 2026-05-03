@@ -35,7 +35,7 @@ Action ComportamientoTecnico::think(Sensores sensores) {
  * @return Un carácter que indica si la casilla es accesible o no.
  */
 char CasillaAccesibleT(char casilla, int dif){
-  if (!(casilla == 'C' || casilla == 'D' || casilla == 'U'))
+  if (!(casilla == 'C' || casilla == 'D' || casilla == 'U' || casilla == 'S'))
     return 'P';
 
   if (abs(dif) <= 1 )
@@ -126,34 +126,29 @@ Action ComportamientoTecnico::MejorAccion(char i, char c, char d , Sensores sens
     return accion_elegida;
 }
 
-
-// Niveles del técnico
 Action ComportamientoTecnico::ComportamientoTecnicoNivel_0(Sensores sensores) {
-  Action accion = IDLE;
-
-  // Actualizar el mapa interno con la información de los sensores
+   // Actualizar el mapa interno con la información de los sensores
   ActualizarMapa(sensores);
-
-  // El agente comienza sin zapatillas, pero si detecta una casilla 'D' delante, las recoge.
+  
+  //  actualiza sus zapatillas aquí
   if (sensores.superficie[0] == 'D') tiene_zapatillas = true;
 
   // Definicion del comportamiento del agente 
   if (sensores.superficie[0] == 'U'){ 
     return IDLE; // Llegamos a la meta
   }
+  
+  // Calculamos la accesibilidad REAL usando la cota y las zapatillas
+  char i = CasillaAccesibleT(sensores.superficie[1], sensores.cota[1] - sensores.cota[0]);
+  char c = CasillaAccesibleT(sensores.superficie[2], sensores.cota[2] - sensores.cota[0]);
+  char d = CasillaAccesibleT(sensores.superficie[3], sensores.cota[3] - sensores.cota[0]);
 
-  char i= CasillaAccesibleT(sensores.superficie[1], sensores.cota[1] - sensores.cota[0]);
-  char c= CasillaAccesibleT(sensores.superficie[2], sensores.cota[2] - sensores.cota[0]);
-  char d= CasillaAccesibleT(sensores.superficie[3], sensores.cota[3] - sensores.cota[0]);
+  // Llamar al motor de exploración pasándole el estado de las zapatillas
+  Action accion = MejorAccion(i, c, d, sensores);
 
-  accion = MejorAccion(i, c, d, sensores);
-
-  // Devolver la accion decidida
   last_action = accion;
   return accion;
-
 }
-
 /**
  * @brief Comprueba si una celda es de tipo camino transitable.
  * @param c Carácter que representa el tipo de superficie.
@@ -170,7 +165,64 @@ bool ComportamientoTecnico::es_camino(unsigned char c) const {
  * @return Acción a realizar.
  */
 Action ComportamientoTecnico::ComportamientoTecnicoNivel_1(Sensores sensores) {
-  return IDLE;
+ if (mapa_visitas.empty()) {
+        mapa_visitas.assign(mapaResultado.size(), std::vector<int>(mapaResultado[0].size(), 0));
+    }
+
+    ActualizarMapa(sensores);
+    if (sensores.superficie[0] == 'D') tiene_zapatillas = true;
+
+    static int f_ant_t = -1, c_ant_t = -1;
+    if (sensores.posF != f_ant_t || sensores.posC != c_ant_t) {
+        mapa_visitas[sensores.posF][sensores.posC]++;
+        f_ant_t = sensores.posF;
+        c_ant_t = sensores.posC;
+    }
+
+    char i = CasillaAccesibleT(sensores.superficie[1], sensores.cota[1] - sensores.cota[0]);
+    char c = CasillaAccesibleT(sensores.superficie[2], sensores.cota[2] - sensores.cota[0]);
+    char d = CasillaAccesibleT(sensores.superficie[3], sensores.cota[3] - sensores.cota[0]);
+
+    ubicacion actual;
+    actual.f = sensores.posF; actual.c = sensores.posC; actual.brujula = sensores.rumbo;
+
+    ubicacion u_izq = actual; u_izq.brujula = (Orientacion)(((int)actual.brujula + 7) % 8); u_izq = Delante(u_izq);
+    ubicacion u_cen = Delante(actual);
+    ubicacion u_der = actual; u_der.brujula = (Orientacion)(((int)actual.brujula + 1) % 8); u_der = Delante(u_der);
+
+    int v_izq = (i != 'P' && sensores.agentes[1] == '_') ? mapa_visitas[u_izq.f][u_izq.c] : 999999;
+    int v_cen = (c != 'P' && sensores.agentes[2] == '_') ? mapa_visitas[u_cen.f][u_cen.c] : 999999;
+    int v_der = (d != 'P' && sensores.agentes[3] == '_') ? mapa_visitas[u_der.f][u_der.c] : 999999;
+
+    int score_izq = (v_izq == 999999) ? 999999 : (v_izq * 1000);
+    int score_cen = (v_cen == 999999) ? 999999 : (v_cen * 1000);
+    int score_der = (v_der == 999999) ? 999999 : (v_der * 1000);
+
+    if (score_izq != 999999) {
+        if (i == 'C') score_izq -= 30;
+        else if (i == 'S') score_izq -= 20;
+        // El Técnico no recibe bonificación a la izquierda
+    }
+    if (score_cen != 999999) {
+        if (c == 'C') score_cen -= 30;
+        else if (c == 'S') score_cen -= 20;
+        score_cen -= 5;
+    }
+    if (score_der != 999999) {
+        if (d == 'C') score_der -= 30;
+        else if (d == 'S') score_der -= 20;
+        score_der -= 2; // Personalidad de abrazo a la derecha
+    }
+
+    Action accion = TURN_SR; 
+    int min_score = 999999;
+
+    if (score_cen < min_score) { min_score = score_cen; accion = WALK; }
+    if (score_izq < min_score) { min_score = score_izq; accion = TURN_SL; }
+    if (score_der < min_score) { min_score = score_der; accion = TURN_SR; }
+
+    last_action = accion;
+    return accion;
 }
 
 /**

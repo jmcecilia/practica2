@@ -73,8 +73,6 @@ public:
   // ÁREA DE IMPLEMENTACIÓN DEL ESTUDIANTE
   // =========================================================================
 
-  bool PuedeAvanzar(Sensores sensores);
-
   /**
    * @brief Función para decidir la mejor acción a tomar según las casillas accesibles.
    * @param i Carácter que representa la casilla izquierda.
@@ -208,6 +206,8 @@ private:
   Action last_action;
   bool alternar;            // (Para evitar rebotes en diagonales)
   int esquinaDer;            // Contador para detectar esquinas a la derecha (no utilizado en esta práctica, pero puede ser útil para niveles avanzados)
+  std::vector<std::vector<int>> mapa_visitas; // Mapa para contar el número de visitas a cada casilla (util nivel 1)
+
 };
 
 #endif

@@ -62,7 +62,6 @@ public:
   // =========================================================================
 
   
-  bool PuedeAvanzar(Sensores sensores, bool zap);
 
   /**
    * @brief Función para el pensar el movimiento del ingeniero.
@@ -203,6 +202,7 @@ private:
   int giro45Izq;            // Contador de giros de 45 grados a la izquierda que pueden darse.
   bool alternar;
   int esquinaDer;          // Contador para detectar esquinas (incrementa al girar a la derecha, decrementa al girar a la izquierda)
+  std::vector<std::vector<int>> mapa_visitas; // Mapa para contar el número de visitas a cada casilla (util nivel 1)
 };
 
 #endif

@@ -50,7 +50,7 @@ Action ComportamientoIngeniero::think(Sensores sensores)
  * @return Un carácter que indica si la casilla es accesible o no.
  */
 char CasillaAccesibleI(char casilla, int dif, bool zap){
-  if (!(casilla == 'C' || casilla == 'D' || casilla == 'U'))
+  if (!(casilla == 'C' || casilla == 'D' || casilla == 'U' || casilla == 'S'))
     return 'P';
 
   if (abs(dif) <= 1 || (zap && abs(dif) <= 2))
@@ -58,17 +58,6 @@ char CasillaAccesibleI(char casilla, int dif, bool zap){
 
   return 'P';
 }
-
-bool ComportamientoIngeniero::PuedeAvanzar(Sensores sensores, bool zap){
-  char c = CasillaAccesibleI(
-      sensores.superficie[2],
-      sensores.cota[2] - sensores.cota[0],
-      zap
-  );
-
-  return (c != 'P');
-}
-
 
 /**
  * @brief Función para decidir la mejor acción a tomar según las casillas accesibles.
@@ -158,26 +147,30 @@ Action ComportamientoIngeniero::MejorAccion(char i, char c, char d, bool tiene_z
     return accion_elegida;
 }
 
-
-// Niveles iniciales (Comportamientos reactivos simples)
-Action ComportamientoIngeniero::ComportamientoIngenieroNivel_0(Sensores sensores)
-{
-  Action accion = IDLE;
-
+/**
+ * @brief Comportamiento reactivo del ingeniero para el Nivel 0.
+ * @param sensores Datos actuales de los sensores.
+ * @return Acción a realizar.
+ */
+Action ComportamientoIngeniero::ComportamientoIngenieroNivel_0(Sensores sensores){
+  // Actualizar el mapa interno con la información de los sensores
   ActualizarMapa(sensores);
-
+  
+  // OJO: El ingeniero actualiza sus zapatillas aquí
   if (sensores.superficie[0] == 'D') tiene_zapatillas = true;
 
+  // Definicion del comportamiento del agente 
   if (sensores.superficie[0] == 'U'){ 
-    return IDLE;
+    return IDLE; // Llegamos a la meta
   }
-
+  
+  // Calculamos la accesibilidad REAL usando la cota y las zapatillas
   char i = CasillaAccesibleI(sensores.superficie[1], sensores.cota[1] - sensores.cota[0], tiene_zapatillas);
   char c = CasillaAccesibleI(sensores.superficie[2], sensores.cota[2] - sensores.cota[0], tiene_zapatillas);
   char d = CasillaAccesibleI(sensores.superficie[3], sensores.cota[3] - sensores.cota[0], tiene_zapatillas);
 
-
-  accion = MejorAccion(i, c, d, tiene_zapatillas, sensores);
+  // Llamar al motor de exploración pasándole el estado de las zapatillas
+  Action accion = MejorAccion(i, c, d, tiene_zapatillas, sensores);
 
   last_action = accion;
   return accion;
@@ -200,8 +193,70 @@ bool ComportamientoIngeniero::es_camino(unsigned char c) const
  */
 Action ComportamientoIngeniero::ComportamientoIngenieroNivel_1(Sensores sensores)
 {
-  // TODO: Implementar comportamiento reactivo para el Nivel 1.
-  return IDLE;
+ if (mapa_visitas.empty()) {
+        mapa_visitas.assign(mapaResultado.size(), std::vector<int>(mapaResultado[0].size(), 0));
+    }
+
+    ActualizarMapa(sensores);
+    if (sensores.superficie[0] == 'D') tiene_zapatillas = true;
+
+    // Solo sumar visita al cambiar de casilla físicamente
+    static int f_ant_i = -1, c_ant_i = -1;
+    if (sensores.posF != f_ant_i || sensores.posC != c_ant_i) {
+        mapa_visitas[sensores.posF][sensores.posC]++;
+        f_ant_i = sensores.posF;
+        c_ant_i = sensores.posC;
+    }
+
+    char i = CasillaAccesibleI(sensores.superficie[1], sensores.cota[1] - sensores.cota[0], tiene_zapatillas);
+    char c = CasillaAccesibleI(sensores.superficie[2], sensores.cota[2] - sensores.cota[0], tiene_zapatillas);
+    char d = CasillaAccesibleI(sensores.superficie[3], sensores.cota[3] - sensores.cota[0], tiene_zapatillas);
+
+    ubicacion actual;
+    actual.f = sensores.posF; actual.c = sensores.posC; actual.brujula = sensores.rumbo;
+
+    ubicacion u_izq = actual; u_izq.brujula = (Orientacion)(((int)actual.brujula + 7) % 8); u_izq = Delante(u_izq);
+    ubicacion u_cen = Delante(actual);
+    ubicacion u_der = actual; u_der.brujula = (Orientacion)(((int)actual.brujula + 1) % 8); u_der = Delante(u_der);
+
+    // Los agentes y los muros son obstáculos insalvables
+    int v_izq = (i != 'P' && sensores.agentes[1] == '_') ? mapa_visitas[u_izq.f][u_izq.c] : 999999;
+    int v_cen = (c != 'P' && sensores.agentes[2] == '_') ? mapa_visitas[u_cen.f][u_cen.c] : 999999;
+    int v_der = (d != 'P' && sensores.agentes[3] == '_') ? mapa_visitas[u_der.f][u_der.c] : 999999;
+
+
+    // SISTEMA ESTRICTO DE PUNTUACIÓN (Menor puntuación = Mejor ruta)
+    int score_izq = (v_izq == 999999) ? 999999 : (v_izq * 1000);
+    int score_cen = (v_cen == 999999) ? 999999 : (v_cen * 1000);
+    int score_der = (v_der == 999999) ? 999999 : (v_der * 1000);
+
+    // Bonificaciones (solo si no es pared)
+    if (score_izq != 999999) {
+        if (i == 'C') score_izq -= 30;
+        else if (i == 'S') score_izq -= 20;
+        score_izq -= 2; // INGENIERO: Personalidad de abrazo a la IZQUIERDA
+    }
+    if (score_cen != 999999) {
+        if (c == 'C') score_cen -= 30;
+        else if (c == 'S') score_cen -= 20;
+        score_cen -= 5; // Preferencia universal por no zigzaguear (ir recto)
+    }
+    if (score_der != 999999) {
+        if (d == 'C') score_der -= 30;
+        else if (d == 'S') score_der -= 20;
+        // El Ingeniero no recibe bonificación a la derecha
+    }
+
+    Action accion = TURN_SR; // Acción por defecto si esta en un callejon sin salida
+    int min_score = 999999;
+
+    // Elegimos la ruta con menor puntuación total
+    if (score_cen < min_score) { min_score = score_cen; accion = WALK; }
+    if (score_izq < min_score) { min_score = score_izq; accion = TURN_SL; }
+    if (score_der < min_score) { min_score = score_der; accion = TURN_SR; }
+
+    last_action = accion;
+    return accion;
 }
 
 // Niveles avanzados (Uso de búsqueda)
