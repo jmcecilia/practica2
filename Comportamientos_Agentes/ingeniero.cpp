@@ -190,9 +190,7 @@ bool ComportamientoIngeniero::CasillaAccesibleWalkI(const EstadoI &st, const std
     
     unsigned char terreno = mapaR[next.f][next.c];
     
-    // 2. REGLAS ACTUALIZADAS DEL INGENIERO:
     // No puede pisar Precipicios ('P'), Muros ('M') NI Bosque ('B').
-    // ¡El Agua ('A') SÍ está permitida!
     if (terreno == 'P' || terreno == 'M' || terreno == 'B') return false; 
     
     // 3. Diferencia de altura (1 sin zapatillas, 2 con zapatillas)
@@ -211,13 +209,14 @@ bool ComportamientoIngeniero::CasillaAccesibleJumpI(const EstadoI &st, const std
     unsigned char terrMid = mapaR[mid.f][mid.c];
     unsigned char terrFin = mapaR[fin.f][fin.c];
 
-    // Casilla intermedia: Bloqueamos P, M y B. Permitimos A.
+    // 1. La casilla intermedia DEBE ser transitable. 
+    // No miramos su cota porque "La altura de la Casilla Intermedia no afecta".
     if (terrMid == 'P' || terrMid == 'M' || terrMid == 'B') return false;
-    if (mapaC[mid.f][mid.c] > mapaC[st.f][st.c]) return false;
 
-    // Casilla destino: Bloqueamos P, M y B. Permitimos A.
+    // 2. La casilla destino DEBE ser transitable.
     if (terrFin == 'P' || terrFin == 'M' || terrFin == 'B') return false;
     
+    // 3. La diferencia de altura es solo entre Inicial y Destino.
     int dif = mapaC[fin.f][fin.c] - mapaC[st.f][st.c];
     if (abs(dif) <= 1 || (st.zapatillas && abs(dif) <= 2)) return true;
 
@@ -418,6 +417,8 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_1(Sensores sensores
         inicio.c = sensores.posC;
         inicio.brujula = sensores.rumbo;
         inicio.zapatillas = tiene_zapatillas;
+        // Verificar si nacimos sobre las zapatillas
+        if (mapaResultado[sensores.posF][sensores.posC] == 'D') tiene_zapatillas = true;
 
         // Configuramos el estado objetivo (donde está la filtración)
         EstadoI objetivo;
@@ -447,6 +448,8 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_1(Sensores sensores
             hayPlan = false;
         }
     }
+
+    PintaPlan(plan); // Visualizamos el plan restante en cada paso
 
     return accion;
 }
