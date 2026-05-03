@@ -7,6 +7,7 @@
 #include <set>
 #include <thread>
 #include <time.h>
+#include <queue>
 
 #include "comportamientos/comportamiento.hpp"
 
@@ -36,7 +37,9 @@ public:
   ComportamientoIngeniero(std::vector<std::vector<unsigned char>> mapaR, 
                          std::vector<std::vector<unsigned char>> mapaC): 
                          Comportamiento(mapaR, mapaC) {
-    // Inicializar Variables de Estado
+    hayPlan = false;
+    last_action = IDLE;
+    tiene_zapatillas = false;
   }
 
   ComportamientoIngeniero(const ComportamientoIngeniero &comport)
@@ -60,9 +63,6 @@ public:
   // =========================================================================
   // ÁREA DE IMPLEMENTACIÓN DEL ESTUDIANTE
   // =========================================================================
-
-  
-
   /**
    * @brief Función para el pensar el movimiento del ingeniero.
    * @param casilla Carácter que representa la casilla a evaluar.
@@ -196,6 +196,33 @@ private:
   // VARIABLES DE ESTADO (PUEDEN SER EXTENDIDAS POR EL ALUMNO)
   // =========================================================================
 
+  struct EstadoI {
+    int f;
+    int c;
+    Orientacion brujula;
+    bool zapatillas;
+
+    // Operador de igualdad para comparar si dos estados son exactamente iguales
+    bool operator==(const EstadoI &st) const {
+        return f == st.f && c == st.c && brujula == st.brujula && zapatillas == st.zapatillas;
+    }
+
+    // Operador de orden para poder usar EstadoI dentro de un std::set (explorados)
+    bool operator<(const EstadoI &st) const {
+        if (f < st.f) return true;
+        if (f == st.f && c < st.c) return true;
+        if (f == st.f && c == st.c && brujula < st.brujula) return true;
+        if (f == st.f && c == st.c && brujula == st.brujula && zapatillas < st.zapatillas) return true;
+        return false;
+    }
+};
+
+struct NodoI {
+    EstadoI estado;
+    std::list<Action> secuencia;
+};
+
+//Variables nivel 0 y 1
 
   Action last_action;       // Última acción realizada 
   bool tiene_zapatillas;    // Indica si el agente posee zapatillas
@@ -203,6 +230,36 @@ private:
   bool alternar;
   int esquinaDer;          // Contador para detectar esquinas (incrementa al girar a la derecha, decrementa al girar a la izquierda)
   std::vector<std::vector<int>> mapa_visitas; // Mapa para contar el número de visitas a cada casilla (util nivel 1)
+
+// Variables para nivel 2
+
+
+// Variables de estado deliberativo
+bool hayPlan;std::list<Action> plan;
+
+  // =========================================================================
+  // FUNCIONES DEL NIVEL 2
+  // =========================================================================
+
+  std::list<Action> B_Anchura_Ingeniero(const EstadoI &inicio, const EstadoI &final, 
+                                        const std::vector<std::vector<unsigned char>> &mapaR, 
+                                        const std::vector<std::vector<unsigned char>> &mapaC);
+
+  EstadoI applyI(Action accion, const EstadoI &st, 
+                 const std::vector<std::vector<unsigned char>> &mapaR, 
+                 const std::vector<std::vector<unsigned char>> &mapaC);
+
+  EstadoI NextCasillaI(const EstadoI &st, Action accion);
+
+  bool CasillaAccesibleWalkI(const EstadoI &st, 
+                             const std::vector<std::vector<unsigned char>> &mapaR, 
+                             const std::vector<std::vector<unsigned char>> &mapaC);
+
+  bool CasillaAccesibleJumpI(const EstadoI &st, 
+                             const std::vector<std::vector<unsigned char>> &mapaR, 
+                             const std::vector<std::vector<unsigned char>> &mapaC);
+
+
 };
 
 #endif

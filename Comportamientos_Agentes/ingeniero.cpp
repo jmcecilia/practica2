@@ -42,6 +42,13 @@ Action ComportamientoIngeniero::think(Sensores sensores)
 
   return accion;
 }
+
+// =========================================================
+// Nivel 0 y 1
+// =========================================================
+
+
+
 /** 
  * @brief Función para detectar casillas accesibles.
  * @param casilla Carácter que representa la casilla a evaluar.
@@ -145,6 +152,141 @@ Action ComportamientoIngeniero::MejorAccion(char i, char c, char d, bool tiene_z
     }
 
     return accion_elegida;
+}
+
+// =========================================================
+// Nivel 2
+// =========================================================
+
+// --- 2. Funciones de Transición de Estado ---
+ComportamientoIngeniero::EstadoI ComportamientoIngeniero::NextCasillaI(const EstadoI &st, Action accion) {
+    EstadoI siguiente = st;
+
+    if (accion == TURN_SR) {
+        siguiente.brujula = static_cast<Orientacion>((siguiente.brujula + 1) % 8);
+    } else if (accion == TURN_SL) {
+        siguiente.brujula = static_cast<Orientacion>((siguiente.brujula + 7) % 8);
+    } else if (accion == WALK || accion == JUMP) {
+        int pasos = (accion == WALK) ? 1 : 2;
+        switch (st.brujula) {
+            case norte:    siguiente.f -= pasos; break;
+            case noreste:  siguiente.f -= pasos; siguiente.c += pasos; break;
+            case este:     siguiente.c += pasos; break;
+            case sureste:  siguiente.f += pasos; siguiente.c += pasos; break;
+            case sur:      siguiente.f += pasos; break;
+            case suroeste: siguiente.f += pasos; siguiente.c -= pasos; break;
+            case oeste:    siguiente.c -= pasos; break;
+            case noroeste: siguiente.f -= pasos; siguiente.c -= pasos; break;
+        }
+    }
+    return siguiente;
+}
+
+bool ComportamientoIngeniero::CasillaAccesibleWalkI(const EstadoI &st, const std::vector<std::vector<unsigned char>> &mapaR, const std::vector<std::vector<unsigned char>> &mapaC) {
+    EstadoI next = NextCasillaI(st, WALK);
+    
+    // 1. Comprobar límites
+    if (next.f < 0 || next.f >= mapaR.size() || next.c < 0 || next.c >= mapaR[0].size()) return false;
+    
+    unsigned char terreno = mapaR[next.f][next.c];
+    
+    // 2. REGLAS ACTUALIZADAS DEL INGENIERO:
+    // No puede pisar Precipicios ('P'), Muros ('M') NI Bosque ('B').
+    // ¡El Agua ('A') SÍ está permitida!
+    if (terreno == 'P' || terreno == 'M' || terreno == 'B') return false; 
+    
+    // 3. Diferencia de altura (1 sin zapatillas, 2 con zapatillas)
+    int dif = mapaC[next.f][next.c] - mapaC[st.f][st.c];
+    if (abs(dif) <= 1 || (st.zapatillas && abs(dif) <= 2)) return true;
+    
+    return false;
+}
+
+bool ComportamientoIngeniero::CasillaAccesibleJumpI(const EstadoI &st, const std::vector<std::vector<unsigned char>> &mapaR, const std::vector<std::vector<unsigned char>> &mapaC) {
+    EstadoI mid = NextCasillaI(st, WALK);
+    EstadoI fin = NextCasillaI(st, JUMP);
+
+    if (fin.f < 0 || fin.f >= mapaR.size() || fin.c < 0 || fin.c >= mapaR[0].size()) return false;
+
+    unsigned char terrMid = mapaR[mid.f][mid.c];
+    unsigned char terrFin = mapaR[fin.f][fin.c];
+
+    // Casilla intermedia: Bloqueamos P, M y B. Permitimos A.
+    if (terrMid == 'P' || terrMid == 'M' || terrMid == 'B') return false;
+    if (mapaC[mid.f][mid.c] > mapaC[st.f][st.c]) return false;
+
+    // Casilla destino: Bloqueamos P, M y B. Permitimos A.
+    if (terrFin == 'P' || terrFin == 'M' || terrFin == 'B') return false;
+    
+    int dif = mapaC[fin.f][fin.c] - mapaC[st.f][st.c];
+    if (abs(dif) <= 1 || (st.zapatillas && abs(dif) <= 2)) return true;
+
+    return false;
+}
+
+ComportamientoIngeniero::EstadoI ComportamientoIngeniero::applyI(Action accion, const EstadoI &st, const std::vector<std::vector<unsigned char>> &mapaR, const std::vector<std::vector<unsigned char>> &mapaC) {
+    EstadoI next = st;
+
+    if (accion == WALK && CasillaAccesibleWalkI(st, mapaR, mapaC)) {
+        next = NextCasillaI(st, WALK);
+    } else if (accion == JUMP && CasillaAccesibleJumpI(st, mapaR, mapaC)) {
+        next = NextCasillaI(st, JUMP);
+    } else if (accion == TURN_SL || accion == TURN_SR) {
+        next = NextCasillaI(st, accion);
+    }
+
+    // Actualizar si recogimos zapatillas en el nuevo estado
+    if (mapaR[next.f][next.c] == 'D') {
+        next.zapatillas = true;
+    }
+
+    return next;
+}
+
+// --- 3. Algoritmo de Búsqueda en Anchura ---
+std::list<Action> ComportamientoIngeniero::B_Anchura_Ingeniero(const EstadoI &inicio, const EstadoI &final, const std::vector<std::vector<unsigned char>> &mapaR, const std::vector<std::vector<unsigned char>> &mapaC) {
+    
+    std::queue<NodoI> frontier; // Cola de nodos por explorar
+    std::set<EstadoI> explored; // Conjunto eficiente para estados visitados
+    std::list<Action> path;
+
+    NodoI current_node;
+    current_node.estado = inicio;
+    frontier.push(current_node);
+    explored.insert(inicio);
+
+    bool SolutionFound = (inicio.f == final.f && inicio.c == final.c);
+
+    Action posibles_acciones[] = {WALK, JUMP, TURN_SR, TURN_SL}; // Priorizamos avanzar frente a girar
+
+    while (!SolutionFound && !frontier.empty()) {
+        current_node = frontier.front();
+        frontier.pop();
+
+        for (Action accion : posibles_acciones) {
+            EstadoI estado_hijo = applyI(accion, current_node.estado, mapaR, mapaC);
+
+            // Verificamos si el estado generado es diferente al actual (acción válida) y no ha sido explorado
+            if (!(estado_hijo == current_node.estado) && explored.find(estado_hijo) == explored.end()) {
+                
+                NodoI hijo;
+                hijo.estado = estado_hijo;
+                hijo.secuencia = current_node.secuencia;
+                hijo.secuencia.push_back(accion);
+
+                if (estado_hijo.f == final.f && estado_hijo.c == final.c) {
+                    SolutionFound = true;
+                    path = hijo.secuencia;
+                    break;
+                }
+
+                explored.insert(estado_hijo);
+                frontier.push(hijo);
+            }
+        }
+    }
+
+    return path;
 }
 
 /**
@@ -265,10 +407,48 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_1(Sensores sensores
  * @param sensores Datos actuales de los sensores.
  * @return Acción a realizar.
  */
-Action ComportamientoIngeniero::ComportamientoIngenieroNivel_2(Sensores sensores)
+  Action ComportamientoIngeniero::ComportamientoIngenieroNivel_2(Sensores sensores)
 {
-  // TODO: Implementar búsqueda para el Nivel 2.
-  return IDLE;
+    Action accion = IDLE;
+
+    if (!hayPlan) {
+        // Configuramos el estado de inicio
+        EstadoI inicio;
+        inicio.f = sensores.posF;
+        inicio.c = sensores.posC;
+        inicio.brujula = sensores.rumbo;
+        inicio.zapatillas = tiene_zapatillas;
+
+        // Configuramos el estado objetivo (donde está la filtración)
+        EstadoI objetivo;
+        objetivo.f = sensores.BelPosF;
+        objetivo.c = sensores.BelPosC;
+
+        // Calculamos la ruta
+        plan = B_Anchura_Ingeniero(inicio, objetivo, mapaResultado, mapaCotas);
+        
+        if (!plan.empty()) {
+            // CORRECCIÓN: Empaquetar posición en 'ubicacion' para VisualizaPlan
+            ubicacion u_inicio;
+            u_inicio.f = sensores.posF;
+            u_inicio.c = sensores.posC;
+            u_inicio.brujula = sensores.rumbo;
+            
+            VisualizaPlan(u_inicio, plan); 
+            hayPlan = true;
+        }
+    }
+
+    // Si tenemos plan y no está vacío, ejecutamos la siguiente acción
+    if (hayPlan && !plan.empty()) {
+        accion = plan.front();
+        plan.pop_front();
+        if (plan.empty()) {
+            hayPlan = false;
+        }
+    }
+
+    return accion;
 }
 
 /**
