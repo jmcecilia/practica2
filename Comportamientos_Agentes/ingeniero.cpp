@@ -158,7 +158,7 @@ Action ComportamientoIngeniero::MejorAccion(char i, char c, char d, bool tiene_z
 // Nivel 2
 // =========================================================
 
-// --- 2. Funciones de Transición de Estado ---
+// --- 1. Funciones de Transición de Estado ---
 ComportamientoIngeniero::EstadoI ComportamientoIngeniero::NextCasillaI(const EstadoI &st, Action accion) {
     EstadoI siguiente = st;
 
@@ -242,7 +242,7 @@ ComportamientoIngeniero::EstadoI ComportamientoIngeniero::applyI(Action accion, 
     return next;
 }
 
-// --- 3. Algoritmo de Búsqueda en Anchura ---
+// --- 2. Algoritmo de Búsqueda en Anchura ---
 std::list<Action> ComportamientoIngeniero::B_Anchura_Ingeniero(const EstadoI &inicio, const EstadoI &final, const std::vector<std::vector<unsigned char>> &mapaR, const std::vector<std::vector<unsigned char>> &mapaC) {
     
     std::queue<NodoI> frontier; // Cola de nodos por explorar
@@ -286,6 +286,176 @@ std::list<Action> ComportamientoIngeniero::B_Anchura_Ingeniero(const EstadoI &in
     }
 
     return path;
+}
+
+
+// =========================================================
+// Funciones Nivel 4
+// =========================================================
+
+std::list<Paso> ComportamientoIngeniero::dijkstra_nivel4(const estadoN4& inicio, const estadoN4& destino, int max_impacto, int max_energia) {
+    std::priority_queue<nodoN4> Abiertos;
+    std::map<ClaveCerrados, std::vector<InfoVisitado>> Cerrados;
+
+    auto getCosteEcoLocal = [](int accion, unsigned char celda) -> int {
+        switch (accion) {
+            case 0: // INSTALL
+                if (celda == 'A') return 50;
+                if (celda == 'H') return 45;
+                if (celda == 'S') return 25;
+                if (celda == 'C' || celda == 'U') return 15;
+                return 30;
+            case 1: // RAISE
+                if (celda == 'A') return 1000000;
+                if (celda == 'H') return 55;
+                if (celda == 'S') return 30;
+                if (celda == 'C' || celda == 'U') return 10;
+                return 40;
+            case -1: // DIG
+                if (celda == 'A') return 1000000;
+                if (celda == 'H') return 65;
+                if (celda == 'S') return 40;
+                if (celda == 'C' || celda == 'U') return 25;
+                return 50;
+            default: return 0;
+        }
+    };
+
+    auto getCosteEnergiaLocal = [](int accion, unsigned char celda) -> int {
+        switch (accion) {
+            case 0: // INSTALL
+                if (celda == 'A') return 60;
+                if (celda == 'H') return 45;
+                if (celda == 'S') return 25;
+                if (celda == 'C' || celda == 'U') return 15;
+                return 30;
+            case 1: // RAISE
+                if (celda == 'A') return 1000000;
+                if (celda == 'H') return 55;
+                if (celda == 'S') return 30;
+                if (celda == 'C' || celda == 'U') return 10;
+                return 40;
+            case -1: // DIG
+                if (celda == 'A') return 1000000;
+                if (celda == 'H') return 65;
+                if (celda == 'S') return 40;
+                if (celda == 'C' || celda == 'U') return 25;
+                return 50;
+            default: return 0;
+        }
+    };
+
+    char terrOrigen = mapaResultado[inicio.fila][inicio.columna];
+    int h_origen = mapaCotas[inicio.fila][inicio.columna];
+
+    int operaciones_inicio[3] = {0, -1, 1};
+    for (int op : operaciones_inicio) {
+        if (terrOrigen == 'A' && op != 0) continue; 
+        if (terrOrigen == 'P' || terrOrigen == 'M' || terrOrigen == 'B') continue;
+
+        int impacto_init = 0;
+        int energia_init = 0;
+        if (op != 0) {
+            impacto_init = getCosteEcoLocal(op, terrOrigen);
+            energia_init = getCosteEnergiaLocal(op, terrOrigen);
+        }
+        
+        // PRIMERA DOBLE PODA (En la casilla de salida)
+        if (impacto_init > max_impacto || energia_init > max_energia) continue;
+
+        nodoN4 inicial;
+        inicial.st = inicio;
+        inicial.g = 0; 
+        inicial.impacto = impacto_init;
+        inicial.energia = energia_init; // Asignamos la energía
+        inicial.h_efectiva = h_origen + op;
+        inicial.h = 0; 
+        inicial.secuencia.push_back({inicio.fila, inicio.columna, op});
+        
+        Abiertos.push(inicial);
+    }
+
+    int dF[] = {-1, 0, 1, 0};
+    int dC[] = {0, 1, 0, -1};
+
+    while (!Abiertos.empty()) {
+        nodoN4 actual = Abiertos.top();
+        Abiertos.pop();
+
+        if (mapaResultado[actual.st.fila][actual.st.columna] == 'U') {
+            std::cout << "--- PLAN ENCONTRADO (DIJKSTRA) ---" << std::endl;
+            std::cout << "Longitud red: " << actual.g << " tramos." << std::endl;
+            std::cout << "Impacto: " << actual.impacto << " / " << max_impacto << std::endl;
+            std::cout << "Energia: " << actual.energia << " / " << max_energia << std::endl;
+            return actual.secuencia; 
+        }
+
+        ClaveCerrados clave = {actual.st.fila, actual.st.columna, actual.h_efectiva};
+        bool dominado = false;
+        for (const auto& visitado : Cerrados[clave]) {
+            // Un nodo está dominado SÓLO si empeora o iguala en LAS TRES variables
+            if (visitado.g <= actual.g && visitado.impacto <= actual.impacto && visitado.energia <= actual.energia) {
+                dominado = true;
+                break;
+            }
+        }
+        if (dominado) continue;
+        
+        // Importante: Guardar las 3 variables en InfoVisitado
+        Cerrados[clave].push_back({actual.g, actual.impacto, actual.energia});
+
+        for (int i = 0; i < 4; ++i) {
+            estadoN4 sig = {actual.st.fila + dF[i], actual.st.columna + dC[i]};
+
+            if (sig.fila < 0 || sig.fila >= mapaResultado.size() ||
+                sig.columna < 0 || sig.columna >= mapaResultado[0].size()) continue;
+
+            char terrSig = mapaResultado[sig.fila][sig.columna];
+            if (terrSig == 'P' || terrSig == 'M' || terrSig == 'B') continue; 
+            
+            char terrActual = mapaResultado[actual.st.fila][actual.st.columna];
+            int h_sig_orig = mapaCotas[sig.fila][sig.columna];
+
+            int operaciones[3] = {0, -1, 1}; 
+            for (int op : operaciones) {
+                if (terrSig == 'A' && op != 0) continue; 
+                
+                int h_sig_efectiva = h_sig_orig + op;
+                
+                if (h_sig_efectiva == actual.h_efectiva || h_sig_efectiva == actual.h_efectiva - 1) {
+                    
+                    int delta_impacto = getCosteEcoLocal(0, terrActual) + getCosteEcoLocal(0, terrSig);
+                    int delta_energia = getCosteEnergiaLocal(0, terrActual) + getCosteEnergiaLocal(0, terrSig);
+                    
+                    if (op != 0) {
+                        delta_impacto += getCosteEcoLocal(op, terrSig); 
+                        delta_energia += getCosteEnergiaLocal(op, terrSig); 
+                    }
+                    
+                    if (delta_impacto >= 1000000 || delta_energia >= 1000000) continue; 
+
+                    int nuevo_impacto = actual.impacto + delta_impacto;
+                    int nueva_energia = actual.energia + delta_energia;
+                    
+                    // SEGUNDA DOBLE PODA IMPLACABLE
+                    if (nuevo_impacto > max_impacto) continue; 
+                    if (nueva_energia > max_energia) continue; 
+
+                    nodoN4 hijo = actual;
+                    hijo.st = sig;
+                    hijo.g = actual.g + 1;  
+                    hijo.impacto = nuevo_impacto;
+                    hijo.energia = nueva_energia; // Asignamos la nueva energía simulada
+                    hijo.h_efectiva = h_sig_efectiva;
+                    hijo.h = 0; 
+                    hijo.secuencia.push_back({sig.fila, sig.columna, op});
+                    
+                    Abiertos.push(hijo);
+                }
+            }
+        }
+    }
+    return std::list<Paso>(); 
 }
 
 /**
@@ -471,7 +641,22 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_3(Sensores sensores
  */
 Action ComportamientoIngeniero::ComportamientoIngenieroNivel_4(Sensores sensores)
 {
-  return IDLE;
+  if (!hayPlan) {
+        std::cout << "[INFO] Limite ecologico para este mapa: " << sensores.max_ecologico << std::endl;
+        
+        estadoN4 inicio = {sensores.BelPosF, sensores.BelPosC}; 
+        estadoN4 destino_ficticio = {-1, -1}; // Ya no hace falta, Dijkstra se para al ver la 'U'
+        
+        planTuberias = dijkstra_nivel4(inicio, destino_ficticio, sensores.max_ecologico, sensores.energia);
+        
+        if (!planTuberias.empty()) {
+            VisualizaRedTuberias(planTuberias); 
+            hayPlan = true;
+        } else {
+            std::cout << "[ERROR] Imposible bajo estas condiciones físicas." << std::endl;
+        }
+    }
+    return IDLE;
 }
 
 /**

@@ -259,6 +259,61 @@ bool hayPlan;std::list<Action> plan;
                              const std::vector<std::vector<unsigned char>> &mapaR, 
                              const std::vector<std::vector<unsigned char>> &mapaC);
 
+  //========================================================================
+  // FUNCIONES DEL NIVEL 4
+  //========================================================================
+
+  struct estadoN4 {
+    int fila;
+    int columna;
+    bool operator<(const estadoN4& otro) const {
+        if (fila != otro.fila) return fila < otro.fila;
+        return columna < otro.columna;
+    }
+    bool operator==(const estadoN4& otro) const {
+        return fila == otro.fila && columna == otro.columna;
+    }
+};
+
+struct ClaveCerrados {
+    int fila;
+    int columna;
+    int h_efectiva; // La altura de la celda cuenta como un estado distinto
+
+    bool operator<(const ClaveCerrados& otro) const {
+        if (fila != otro.fila) return fila < otro.fila;
+        if (columna != otro.columna) return columna < otro.columna;
+        return h_efectiva < otro.h_efectiva;
+    }
+};
+
+struct InfoVisitado {
+    int g;
+    int impacto;
+    int energia; // ¡AÑADIR ESTO!
+};
+
+struct nodoN4 {
+    estadoN4 st;
+    std::list<Paso> secuencia; 
+    int g;       
+    int h;       
+    int impacto; 
+    int energia; // ¡AÑADIR ESTO!
+    int h_efectiva; 
+    
+    int f() const { return g + h; }
+    
+    // Desempate: prioriza menor energía a igualdad de tramos
+    bool operator<(const nodoN4& otro) const { 
+        if (f() == otro.f()) return energia > otro.energia; 
+        return f() > otro.f(); 
+    }
+};
+
+// Y actualiza la cabecera de la función para recibir la batería
+  std::list<Paso> dijkstra_nivel4(const estadoN4& inicio, const estadoN4& destino, int max_impacto, int max_energia);
+  std::list<Paso> planTuberias; // Aquí guardaremos la ruta final
 
 };
 

@@ -126,6 +126,182 @@ Action ComportamientoTecnico::MejorAccion(char i, char c, char d , Sensores sens
     return accion_elegida;
 }
 
+
+///////////////////////////////////////////////
+// Nivel 3
+///////////////////////////////////////////////
+
+#include <cmath> // Necesario para la heurística euclídea
+
+/**
+ * QUÉ: Calcula la Distancia de Chebyshev.
+ * CÓMO: Obteniendo el valor máximo entre la diferencia de filas y columnas.
+ * POR QUÉ: En un mapa de 8 direcciones donde el coste diagonal es 1, 
+ * Chebyshev es la única heurística matemática que garantiza admisibilidad.
+ */
+int ComportamientoTecnico::HeuristicaChebyshev(int filaAct, int colAct, int filaMeta, int colMeta) {
+    int dFila = std::abs(filaMeta - filaAct);
+    int dCol = std::abs(colMeta - colAct);
+    return std::max(dFila, dCol);
+}
+
+int ComportamientoTecnico::CosteEnergiaTecnico(Action accion, char terreno_origen, int cota_origen, int cota_destino) {
+    int coste = 0;
+    
+    if (accion == WALK) {
+        if (terreno_origen == 'A') {
+            coste = 60;
+            if (cota_destino > cota_origen) coste += 5;
+            else if (cota_destino < cota_origen) coste -= 2;
+        }
+        else if (terreno_origen == 'H') {
+            coste = 6;
+            if (cota_destino > cota_origen) coste += 5;
+            else if (cota_destino < cota_origen) coste -= 2;
+        }
+        else if (terreno_origen == 'S') {
+            coste = 3;
+            if (cota_destino > cota_origen) coste += 5;
+            else if (cota_destino < cota_origen) coste -= 2;
+        }
+        else {
+            // "Resto de casillas" ('C', 'U', 'D', 'B' con zapatillas)
+            // Según la tabla, el incremento/decremento es +0 / -0
+            coste = 1; 
+        }
+        
+        // Seguridad: El coste de avanzar nunca debe ser menor o igual a 0.
+        if (coste < 1) coste = 1;
+        
+    } else if (accion == TURN_SL || accion == TURN_SR) {
+        // Los giros no sufren cambios por altura, solo depende del terreno de origen
+        if (terreno_origen == 'A') coste = 5;
+        else if (terreno_origen == 'H') coste = 2;
+        else if (terreno_origen == 'S') coste = 1;
+        else coste = 1;
+    }
+    
+    return coste;
+}
+
+/**
+ * QUÉ: Verifica si una casilla puede ser pisada.
+ * CÓMO: Descarta precipicios ('P'), muros ('M') y valida la restricción del bosque.
+ * POR QUÉ: Previene que el algoritmo genere ramas inútiles hacia obstáculos o zonas letales.
+ */
+bool ComportamientoTecnico::EsTransitableNivel3(int f, int c, bool tiene_zapatillas) {
+    if (f < 0 || f >= mapaResultado.size() || c < 0 || c >= mapaResultado[0].size()) return false;
+    char terreno = mapaResultado[f][c];
+    
+    if (terreno == 'P' || terreno == 'M') return false;
+    // Si es bosque y no tiene zapatillas, no es transitable
+    if (terreno == 'B' && !tiene_zapatillas) return false;
+    
+    return true;
+}
+
+
+/**
+ * QUÉ: Algoritmo de búsqueda A* para encontrar la ruta óptima de energía.
+ * CÓMO: Expandiendo nodos mediante una cola de prioridad, evaluando WALK, TURN_SL y TURN_SR.
+ * POR QUÉ: Es el requisito principal del Nivel 3. Garantiza encontrar el camino que consume menos batería.
+ */
+std::list<Action> ComportamientoTecnico::AEstrella(const Estado& origen, const Estado& destino) {
+    std::priority_queue<Nodo, std::vector<Nodo>, std::greater<Nodo>> ABIERTA;
+    std::set<Estado> CERRADOS;
+
+    Nodo inicial;
+    inicial.st = origen;
+    inicial.g = 0;
+    inicial.h = HeuristicaChebyshev(origen.fila, origen.columna, destino.fila, destino.columna);
+    ABIERTA.push(inicial);
+
+    while (!ABIERTA.empty()) {
+        Nodo actual = ABIERTA.top();
+        ABIERTA.pop();
+
+        // 1. ¿Hemos llegado a la meta? (Compara coordenadas, no orientación ni ítems)
+        if (actual.st == destino) {
+            return actual.plan;
+        }
+
+        // 2. ¿Ya evaluamos este estado exacto antes?
+        if (CERRADOS.find(actual.st) != CERRADOS.end()) {
+            continue;
+        }
+        CERRADOS.insert(actual.st);
+
+        // 3. Generar Hijos
+        char terreno_actual = mapaResultado[actual.st.fila][actual.st.columna];
+        int cota_actual = mapaCotas[actual.st.fila][actual.st.columna];
+
+        // --- ACCIÓN: AVANZAR (WALK) ---
+        Estado estado_walk = actual.st;
+        // Calculamos la coordenada frontal dependiendo de la brújula
+        ubicacion ubi_actual; 
+        ubi_actual.f = actual.st.fila; 
+        ubi_actual.c = actual.st.columna; 
+        // Hacemos un "cast" explícito de int a Orientacion
+        ubi_actual.brujula = static_cast<Orientacion>(actual.st.orientacion);
+        ubicacion ubi_delante = Delante(ubi_actual);
+        
+        estado_walk.fila = ubi_delante.f;
+        estado_walk.columna = ubi_delante.c;
+
+        if (EsTransitableNivel3(estado_walk.fila, estado_walk.columna, estado_walk.zapatillas)) {
+            int cota_destino = mapaCotas[estado_walk.fila][estado_walk.columna];
+            
+            // Restricción Técnica: Desnivel máximo absoluto de 1
+            if (std::abs(cota_destino - cota_actual) <= 1) {
+                // Si llegamos a una casilla 'D', recogemos zapatillas
+                if (mapaResultado[estado_walk.fila][estado_walk.columna] == 'D') {
+                    estado_walk.zapatillas = true;
+                }
+
+                if (CERRADOS.find(estado_walk) == CERRADOS.end()) {
+                    Nodo hijo_walk;
+                    hijo_walk.st = estado_walk;
+                    hijo_walk.plan = actual.plan;
+                    hijo_walk.plan.push_back(WALK);
+                    hijo_walk.g = actual.g + CosteEnergiaTecnico(WALK, terreno_actual, cota_actual, cota_destino);
+                    hijo_walk.h = HeuristicaChebyshev(estado_walk.fila, estado_walk.columna, destino.fila, destino.columna);
+                    ABIERTA.push(hijo_walk);
+                }
+            }
+        }
+
+        // --- ACCIÓN: GIRAR IZQUIERDA (TURN_SL) ---
+        Estado estado_sl = actual.st;
+        estado_sl.orientacion = (estado_sl.orientacion + 7) % 8; // Girar -45 grados
+        if (CERRADOS.find(estado_sl) == CERRADOS.end()) {
+            Nodo hijo_sl;
+            hijo_sl.st = estado_sl;
+            hijo_sl.plan = actual.plan;
+            hijo_sl.plan.push_back(TURN_SL);
+            hijo_sl.g = actual.g + CosteEnergiaTecnico(TURN_SL, terreno_actual, cota_actual, cota_actual);
+            hijo_sl.h = actual.h; // La heurística no cambia porque no me moví de casilla
+            ABIERTA.push(hijo_sl);
+        }
+
+        // --- ACCIÓN: GIRAR DERECHA (TURN_SR) ---
+        Estado estado_sr = actual.st;
+        estado_sr.orientacion = (estado_sr.orientacion + 1) % 8; // Girar +45 grados
+        if (CERRADOS.find(estado_sr) == CERRADOS.end()) {
+            Nodo hijo_sr;
+            hijo_sr.st = estado_sr;
+            hijo_sr.plan = actual.plan;
+            hijo_sr.plan.push_back(TURN_SR);
+            hijo_sr.g = actual.g + CosteEnergiaTecnico(TURN_SR, terreno_actual, cota_actual, cota_actual);
+            hijo_sr.h = actual.h;
+            ABIERTA.push(hijo_sr);
+        }
+    }
+
+    // Retorna una lista vacía si no hay solución
+    return std::list<Action>();
+}
+
+
 Action ComportamientoTecnico::ComportamientoTecnicoNivel_0(Sensores sensores) {
    // Actualizar el mapa interno con la información de los sensores
   ActualizarMapa(sensores);
@@ -240,7 +416,57 @@ Action ComportamientoTecnico::ComportamientoTecnicoNivel_2(Sensores sensores) {
  * @return Acción a realizar.
  */
 Action ComportamientoTecnico::ComportamientoTecnicoNivel_3(Sensores sensores) {
-  return IDLE;
+  // Si acabamos de encontrar zapatillas pisándolas, actualizamos el estado global
+    if (sensores.superficie[0] == 'D') {
+        tiene_zapatillas = true;
+    }
+
+    // Si ya estamos en la meta, nos quedamos quietos
+    if (sensores.posF == sensores.BelPosF && sensores.posC == sensores.BelPosC) {
+        return IDLE;
+    }
+
+    // Si no tenemos un plan, lo calculamos mediante A*
+    if (!hay_plan) {
+        Estado origen;
+        origen.fila = sensores.posF;
+        origen.columna = sensores.posC;
+        origen.orientacion = sensores.rumbo;
+        origen.zapatillas = tiene_zapatillas;
+
+        Estado destino;
+        destino.fila = sensores.BelPosF;
+        destino.columna = sensores.BelPosC;
+        // La orientación y zapatillas en el destino no importan para el == sobrecargado
+
+        plan_actual = AEstrella(origen, destino);
+        
+        if (!plan_actual.empty()) {
+            hay_plan = true;
+            // Opcional: Puedes descomentar para visualizar el plan en el entorno gráfico
+            // ubicacion st_origen; st_origen.f = sensores.posF; st_origen.c = sensores.posC; st_origen.brujula = sensores.rumbo;
+            // VisualizaPlan(st_origen, plan_actual);
+        } else {
+            // Si A* devuelve vacío, no hay camino posible
+            return IDLE; 
+        }
+    }
+
+    // Si tenemos un plan, ejecutamos la siguiente acción
+    if (hay_plan && !plan_actual.empty()) {
+        Action sig_accion = plan_actual.front();
+        plan_actual.pop_front();
+        
+        // Si el plan se acaba, hay_plan vuelve a false
+        if (plan_actual.empty()) {
+            hay_plan = false;
+        }
+        
+        last_action = sig_accion;
+        return sig_accion;
+    }
+
+    return IDLE;
 }
 
 /**

@@ -49,7 +49,9 @@ public:
                        std::vector<std::vector<unsigned char>> mapaC): 
                        Comportamiento(mapaR, mapaC) {
     // Inicializar Variables de Estado
-
+    last_action = IDLE;
+    tiene_zapatillas = false;
+    hay_plan = false;
   }
 
   ComportamientoTecnico(const ComportamientoTecnico &comport): Comportamiento(comport) {}
@@ -207,6 +209,53 @@ private:
   bool alternar;            // (Para evitar rebotes en diagonales)
   int esquinaDer;            // Contador para detectar esquinas a la derecha (no utilizado en esta práctica, pero puede ser útil para niveles avanzados)
   std::vector<std::vector<int>> mapa_visitas; // Mapa para contar el número de visitas a cada casilla (util nivel 1)
+
+
+  // Nivel 3
+  struct Estado {
+    int fila;
+    int columna;
+    int orientacion;
+    bool zapatillas;
+
+    // Sobrecarga necesaria para usar std::set (lista de Cerrados)
+    bool operator<(const Estado& otro) const {
+        if (fila != otro.fila) return fila < otro.fila;
+        if (columna != otro.columna) return columna < otro.columna;
+        if (orientacion != otro.orientacion) return orientacion < otro.orientacion;
+        return zapatillas < otro.zapatillas;
+    }
+    
+    // Sobrecarga para comparar si llegamos a la meta
+    bool operator==(const Estado& otro) const {
+        return fila == otro.fila && columna == otro.columna;
+    }
+  };
+
+// Representa un nodo en el árbol de búsqueda A*
+  struct Nodo {
+    Estado st;
+    std::list<Action> plan;
+    int g; // Coste real acumulado (Energía)
+    int h; // Heurística (Estimación)
+
+    int f() const { return g + h; }
+
+    // Sobrecarga para que la priority_queue actúe como Min-Heap (menor f primero)
+    bool operator>(const Nodo& otro) const {
+        return f() > otro.f();
+    }
+  };
+
+    // Variables de control de plan
+    std::list<Action> plan_actual;
+    bool hay_plan;
+
+    // Métodos para A*
+    std::list<Action> AEstrella(const Estado& origen, const Estado& destino);
+    int HeuristicaChebyshev(int filaAct, int colAct, int filaMeta, int colMeta);
+    int CosteEnergiaTecnico(Action accion, char terreno_origen, int cota_origen, int cota_destino);
+    bool EsTransitableNivel3(int f, int c, bool tiene_zapatillas);
 
 };
 
