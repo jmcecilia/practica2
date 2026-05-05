@@ -422,7 +422,7 @@ std::list<Paso> ComportamientoIngeniero::dijkstra_nivel4(const estadoN4& inicio,
                 
                 int h_sig_efectiva = h_sig_orig + op;
                 
-                if (h_sig_efectiva == actual.h_efectiva || h_sig_efectiva == actual.h_efectiva - 1) {
+                if (h_sig_efectiva == actual.h_efectiva || h_sig_efectiva == actual.h_efectiva ) {  // +1 porque al ir el ingeniero delante puede hacer el install mirando al tecnico
                     
                     int delta_impacto = getCosteEcoLocal(0, terrActual) + getCosteEcoLocal(0, terrSig);
                     int delta_energia = getCosteEnergiaLocal(0, terrActual) + getCosteEnergiaLocal(0, terrSig);
@@ -456,6 +456,82 @@ std::list<Paso> ComportamientoIngeniero::dijkstra_nivel4(const estadoN4& inicio,
         }
     }
     return std::list<Paso>(); 
+}
+
+// =========================================================
+// Nivel 5 
+// =========================================================
+
+std::list<Action> ComportamientoIngeniero::a_estrella_navegacion(int orig_f, int orig_c, int orig_rumbo, int dest_f, int dest_c, bool zap) {
+    std::priority_queue<nodoNav> Abiertos;
+    std::set<estadoNav> Cerrados;
+
+    nodoNav inicial;
+    inicial.st = {orig_f, orig_c, orig_rumbo};
+    inicial.g = 0;
+    inicial.h = std::abs(orig_f - dest_f) + std::abs(orig_c - dest_c);
+    Abiertos.push(inicial);
+
+    auto esTransitable = [&](int f, int c) {
+        if (f < 0 || f >= mapaResultado.size() || c < 0 || c >= mapaResultado[0].size()) return false;
+        char terr = mapaResultado[f][c];
+        if (terr == 'M' || terr == 'P') return false;
+        if (terr == 'B' ) return false;
+        return true;
+    };
+
+    while (!Abiertos.empty()) {
+        nodoNav actual = Abiertos.top();
+        Abiertos.pop();
+
+        if (actual.st.f == dest_f && actual.st.c == dest_c) {
+            return actual.secuencia; 
+        }
+
+        if (Cerrados.find(actual.st) != Cerrados.end()) continue;
+        Cerrados.insert(actual.st);
+
+        // Giros
+        nodoNav hijoL = actual; hijoL.st.rumbo = (actual.st.rumbo + 7) % 8; hijoL.g += 1; hijoL.secuencia.push_back(TURN_SL); Abiertos.push(hijoL);
+        nodoNav hijoR = actual; hijoR.st.rumbo = (actual.st.rumbo + 1) % 8; hijoR.g += 1; hijoR.secuencia.push_back(TURN_SR); Abiertos.push(hijoR);
+
+        // --- MOVIMIENTOS ---
+        ubicacion ubi_act = {actual.st.f, actual.st.c, (Orientacion)actual.st.rumbo};
+        ubicacion f1 = Delante(ubi_act);
+
+        // Solo podemos avanzar si la casilla frontal es físicamente transitable
+        if (esTransitable(f1.f, f1.c)) {
+            
+            // 1. LÓGICA DE WALK
+            int difW = mapaCotas[f1.f][f1.c] - mapaCotas[actual.st.f][actual.st.c];
+            if (std::abs(difW) <= 1 || (zap && std::abs(difW) <= 2)) {
+                nodoNav hijoW = actual;
+                hijoW.st.f = f1.f; hijoW.st.c = f1.c;
+                hijoW.g += 1; 
+                hijoW.h = std::abs(f1.f - dest_f) + std::abs(f1.c - dest_c);
+                hijoW.secuencia.push_back(WALK);
+                Abiertos.push(hijoW);
+            }
+
+            // 2. LÓGICA DE JUMP (Basada en tus normas)
+            // Como f1 ya es transitable (condición cumplida), miramos a f2
+            ubicacion f2 = Delante(f1);
+            if (esTransitable(f2.f, f2.c)) {
+                // La diferencia de altura en JUMP se calcula solo entre Destino e Inicial
+                int difJ = mapaCotas[f2.f][f2.c] - mapaCotas[actual.st.f][actual.st.c];
+                
+                if (std::abs(difJ) <= 1 || (zap && std::abs(difJ) <= 2)) {
+                    nodoNav hijoJ = actual;
+                    hijoJ.st.f = f2.f; hijoJ.st.c = f2.c;
+                    hijoJ.g += 2; // Cuesta un poco más para evitar que salte si no es estrictamente necesario
+                    hijoJ.h = std::abs(f2.f - dest_f) + std::abs(f2.c - dest_c);
+                    hijoJ.secuencia.push_back(JUMP);
+                    Abiertos.push(hijoJ);
+                }
+            }
+        }
+    }
+    return std::list<Action>();
 }
 
 /**
@@ -666,7 +742,241 @@ Action ComportamientoIngeniero::ComportamientoIngenieroNivel_4(Sensores sensores
  */
 Action ComportamientoIngeniero::ComportamientoIngenieroNivel_5(Sensores sensores)
 {
-  return IDLE;
+  ActualizarMapa(sensores);
+    static bool yendo_a_zapatillas_i = false;
+
+    // 1. Sistema de Zapatillas (Opcional si se cruzan en su vista)
+    if (!tiene_zapatillas) {
+        if (sensores.superficie[0] == 'D') {
+            tiene_zapatillas = true; yendo_a_zapatillas_i = false;
+            estado_ing = CALCULANDO_I; plan_navegacion.clear();
+            return IDLE;
+        }
+        bool veo_zap = false;
+        for (int i = 1; i < 16; i++) if (sensores.superficie[i] == 'D') { veo_zap = true; break; }
+
+        if (veo_zap && !yendo_a_zapatillas_i) {
+            int zf = -1, zc = -1;
+            for (int f = 0; f < mapaResultado.size(); f++)
+                for (int c = 0; c < mapaResultado[0].size(); c++)
+                    if (mapaResultado[f][c] == 'D') { zf = f; zc = c; }
+            if (zf != -1) {
+                yendo_a_zapatillas_i = true;
+                plan_navegacion = a_estrella_navegacion(sensores.posF, sensores.posC, sensores.rumbo, zf, zc, false);
+            }
+        }
+        if (yendo_a_zapatillas_i && !plan_navegacion.empty()) {
+            Action sig = plan_navegacion.front(); plan_navegacion.pop_front();
+            return sig;
+        }
+    }
+
+    auto NavegadorInteligente = [&](int df, int dc) {
+        return a_estrella_navegacion(sensores.posF, sensores.posC, sensores.rumbo, df, dc, tiene_zapatillas);
+    };
+
+    // 2. Máquina de Estados del Ingeniero
+    switch (estado_ing) {
+        case CALCULANDO_I:
+            estado_ing = NAVEGANDO_I;
+            plan_navegacion.clear();
+            return IDLE;
+
+        case NAVEGANDO_I:
+            if (sensores.posF == sensores.BelPosF && sensores.posC == sensores.BelPosC) {
+                estadoN4 inicio = {sensores.BelPosF, sensores.BelPosC}; 
+                planTuberias = dijkstra_nivel4(inicio, {-1,-1}, sensores.max_ecologico, sensores.energia);
+                
+                if (!planTuberias.empty()) {
+                    VisualizaRedTuberias(planTuberias); 
+                    cout << "\n[DEBUG] Plan de Tuberias generado:" << endl;
+                    PintaPlan(planTuberias); 
+                    
+                    estado_ing = TERRAFORMANDO_I; 
+                    paso_idx_ing = 0; 
+                } else {
+                    return TURN_SR; 
+                }
+                return IDLE;
+            }
+            if (plan_navegacion.empty()) plan_navegacion = NavegadorInteligente(sensores.BelPosF, sensores.BelPosC);
+            if (plan_navegacion.empty()) return TURN_SR;
+            { Action sig = plan_navegacion.front(); plan_navegacion.pop_front(); return sig; }
+
+            case TERRAFORMANDO_I: {
+            if (paso_idx_ing >= planTuberias.size()) {
+                cout << "\n[INFO] Terraformacion completada. Volviendo a la Belkanita..." << endl;
+                estado_ing = VOLVIENDO_BASE_I; 
+                plan_navegacion.clear();
+                return IDLE;
+            }
+
+            auto it_curr = planTuberias.begin(); 
+            std::advance(it_curr, paso_idx_ing);
+            
+            // 1. ¿Estamos de pie SOBRE la casilla que toca arreglar?
+            if (sensores.posF == it_curr->fil && sensores.posC == it_curr->col) {
+                
+                // Ya estamos encima. Hacemos las acciones EN ESTA casilla.
+                if (it_curr->op > 0) { 
+                    it_curr->op--; 
+                    cout << "[ACCION] Pisando (" << sensores.posF << "," << sensores.posC << "), hago RAISE." << endl;
+                    return RAISE; 
+                }
+                else if (it_curr->op < 0) { 
+                    it_curr->op++; 
+                    cout << "[ACCION] Pisando (" << sensores.posF << "," << sensores.posC << "), hago DIG." << endl;
+                    return DIG; 
+                }
+                else {
+                    cout << "[ACCION] Casilla (" << sensores.posF << "," << sensores.posC << ") lista." << endl;
+                    paso_idx_ing++; 
+                    return IDLE; 
+                }
+            } 
+            else {
+                // 2. Aún no la estamos pisando. Calculamos el giro más rápido para avanzar.
+                int f_dest = it_curr->fil;
+                int c_dest = it_curr->col;
+                int f_act = sensores.posF;
+                int c_act = sensores.posC;
+                
+                // Averiguamos el rumbo exacto al que tenemos que mirar
+                int rumbo_deseado = sensores.rumbo;
+                if (f_dest < f_act && c_dest == c_act) rumbo_deseado = 0;      // Norte
+                else if (f_dest < f_act && c_dest > c_act) rumbo_deseado = 1;  // Noreste
+                else if (f_dest == f_act && c_dest > c_act) rumbo_deseado = 2; // Este
+                else if (f_dest > f_act && c_dest > c_act) rumbo_deseado = 3;  // Sureste
+                else if (f_dest > f_act && c_dest == c_act) rumbo_deseado = 4; // Sur
+                else if (f_dest > f_act && c_dest < c_act) rumbo_deseado = 5;  // Suroeste
+                else if (f_dest == f_act && c_dest < c_act) rumbo_deseado = 6; // Oeste
+                else if (f_dest < f_act && c_dest < c_act) rumbo_deseado = 7;  // Noroeste
+
+                if (sensores.rumbo == rumbo_deseado) {
+                    // Si ya le miramos, damos el paso
+                    return WALK;
+                } else {
+                    // Si no le miramos, calculamos el giro óptimo (Derecha o Izquierda)
+                    int diff = (rumbo_deseado - sensores.rumbo + 8) % 8;
+                    if (diff <= 4 && diff > 0) return TURN_SR;
+                    else return TURN_SL;
+                }
+            }
+        }
+
+        case VOLVIENDO_BASE_I:
+            if (sensores.posF == sensores.BelPosF && sensores.posC == sensores.BelPosC) {
+                cout << "[INFO] Ingeniero: He vuelto. Llamando al Técnico..." << endl;
+                estado_ing = LLAMANDO_I;
+                return IDLE;
+            }
+            if (plan_navegacion.empty()) plan_navegacion = NavegadorInteligente(sensores.BelPosF, sensores.BelPosC);
+            if (plan_navegacion.empty()) return TURN_SR;
+            { Action sig = plan_navegacion.front(); plan_navegacion.pop_front(); return sig; }
+
+        case LLAMANDO_I:
+            // Ejecuta la acción COME. Esto activa 'venpaca' en el Técnico.
+            estado_ing = ESPERANDO_TECNICO_I;
+            return COME; 
+
+        case ESPERANDO_TECNICO_I:
+            if (sensores.enfrente) {
+                // ¡Están cara a cara! Sincronización perfecta.
+                cout << "[INFO] Ingeniero: Técnico posicionado. ¡A instalar a la vez!" << endl;
+                estado_ing = INSTALANDO_I;
+                
+                // Empezamos a recorrer el plan de Dijkstra desde la casilla 1 (igual que el técnico)
+                paso_idx_ing = 0; 
+                return INSTALL; 
+            } 
+            
+            // Si aún no ha llegado el técnico o no nos mira, nos quedamos apuntando a la casilla 1
+            if (planTuberias.size() < 2) return IDLE;
+            
+            {
+                auto it_next = planTuberias.begin(); 
+                std::advance(it_next, 1); // La primera tubería de la obra
+                
+                ubicacion actual = {sensores.posF, sensores.posC, (Orientacion)sensores.rumbo};
+                ubicacion frente = Delante(actual);
+                
+                // Si ya estamos mirando fijamente a la casilla de la obra, nos quedamos quietos (IDLE)
+                if (frente.f == it_next->fil && frente.c == it_next->col) {
+                    return IDLE; 
+                } else {
+                    // Solo giramos si no estábamos apuntando al sitio correcto
+                    return TURN_SR; 
+                }
+            }
+
+        case INSTALANDO_I: {
+            if (paso_idx_ing >= planTuberias.size()) {
+                cout << "[INFO] Ingeniero: ¡Obra de tuberías finalizada en equipo!" << endl;
+                return IDLE; 
+            }
+
+            auto it_curr = planTuberias.begin(); 
+            std::advance(it_curr, paso_idx_ing);
+            static bool instalada_aqui = false;
+
+            // 1. ¿Estamos de pie sobre la casilla que nos toca?
+            if (sensores.posF == it_curr->fil && sensores.posC == it_curr->col) {
+                
+                // 2. Girar hacia la siguiente tubería (donde está el técnico) antes de instalar
+                if (paso_idx_ing + 1 < planTuberias.size()) {
+                    auto it_next = planTuberias.begin();
+                    std::advance(it_next, paso_idx_ing + 1);
+                    
+                    ubicacion actual = {sensores.posF, sensores.posC, (Orientacion)sensores.rumbo};
+                    ubicacion frente = Delante(actual);
+
+                    if (frente.f != it_next->fil || frente.c != it_next->col) {
+                        return TURN_SR; 
+                    }
+                }
+
+                // 3. Ya estamos mirando al frente. ¿Nos mira el técnico?
+                if (!instalada_aqui) {
+                    if (sensores.enfrente) {
+                        // ¡Nos mira! Disparamos a la vez.
+                        instalada_aqui = true;
+                        cout << "[ACCION] Ingeniero instalando en (" << sensores.posF << "," << sensores.posC << ")" << endl;
+                        return INSTALL;
+                    } else {
+                        // Aún no nos mira. Nos quedamos quietos esperando su mirada.
+                        return IDLE; 
+                    }
+                } else {
+                    // Ya hemos soltado el tubo en el tick anterior. Avanzamos.
+                    paso_idx_ing++;
+                    instalada_aqui = false; 
+                    return IDLE;
+                }
+            } 
+            // 4. Si no estamos en la casilla, la perseguimos
+            else {
+                ubicacion destino = {it_curr->fil, it_curr->col, (Orientacion)0};
+                ubicacion actual = {sensores.posF, sensores.posC, (Orientacion)sensores.rumbo};
+                
+                if (Delante(actual).f == destino.f && Delante(actual).c == destino.c) {
+                    
+                    // ¡NUEVA LÓGICA DE ESPERA INTELIGENTE!
+                    // Comprobamos si el técnico ('t') sigue ocupando la casilla de enfrente
+                    if (sensores.agentes[2] == 't') {
+                        return IDLE; // Esperamos amablemente a que el técnico avance
+                    } else {
+                        return WALK; // La casilla está libre, ¡damos el paso!
+                    }
+                    
+                } else {
+                    return TURN_SR; 
+                }
+            }
+        }
+
+
+        default: return IDLE;
+          }
 }
 
 /**

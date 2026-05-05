@@ -5,6 +5,7 @@
 #include <time.h>
 #include <thread>
 #include <list>
+#include <map>
 
 #include "comportamientos/comportamiento.hpp"
 
@@ -256,6 +257,45 @@ private:
     int HeuristicaChebyshev(int filaAct, int colAct, int filaMeta, int colMeta);
     int CosteEnergiaTecnico(Action accion, char terreno_origen, int cota_origen, int cota_destino);
     bool EsTransitableNivel3(int f, int c, bool tiene_zapatillas);
+
+
+    ////////////////////////////////////////////////////
+    // Nivel 5
+    ////////////////////////////////////////////////////
+
+    // Estructuras para el A* de movimiento (Copia del Ingeniero)
+    struct estadoNav {
+      int f; int c; int rumbo;
+      bool operator<(const estadoNav& o) const {
+          if (f != o.f) return f < o.f;
+          if (c != o.c) return c < o.c;
+          return rumbo < o.rumbo;
+      }
+    };
+
+    struct nodoNav {
+      estadoNav st;
+      std::list<Action> secuencia;
+      int g; int h;
+      int f_val() const { return g + h; }
+      bool operator<(const nodoNav& o) const { return f_val() > o.f_val(); }
+    };
+
+    // Función de navegación segura
+    std::list<Action> a_estrella_navegacion(int orig_f, int orig_c, int orig_rumbo, int dest_f, int dest_c, bool zap);
+
+struct estadoN4 { int fila; int columna; bool operator<(const estadoN4& otro) const { if (fila != otro.fila) return fila < otro.fila; return columna < otro.columna; } bool operator==(const estadoN4& otro) const { return fila == otro.fila && columna == otro.columna; } };
+struct ClaveCerrados { int fila; int columna; int h_efectiva; bool operator<(const ClaveCerrados& otro) const { if (fila != otro.fila) return fila < otro.fila; if (columna != otro.columna) return columna < otro.columna; return h_efectiva < otro.h_efectiva; } };
+struct InfoVisitado { int g; int impacto; int energia; };
+struct nodoN4 { estadoN4 st; std::list<Paso> secuencia; int g; int h; int impacto; int energia; int h_efectiva; int f() const { return g + h; } bool operator<(const nodoN4& otro) const { if (f() == otro.f()) return energia > otro.energia; return f() > otro.f(); } };
+
+std::list<Paso> dijkstra_nivel4(const estadoN4& inicio, const estadoN4& destino, int max_impacto, int max_energia);
+std::list<Paso> planTuberias;
+int paso_idx_t = 1;
+enum EstadoTecnico { 
+        CALCULANDO_T, APARCANDO_T, NAVEGANDO_T, ESPERANDO_I, INSTALANDO_T , ACERCANDOSE_ING, ESPERANDO_LLAMADA, ACUDIENDO_LLAMADA
+    };
+    EstadoTecnico estado_tec = ACERCANDOSE_ING;
 
 };
 

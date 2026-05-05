@@ -315,6 +315,41 @@ struct nodoN4 {
   std::list<Paso> dijkstra_nivel4(const estadoN4& inicio, const estadoN4& destino, int max_impacto, int max_energia);
   std::list<Paso> planTuberias; // Aquí guardaremos la ruta final
 
+  /////////////////////////////////////////////////////
+  // FUNCIONES DEL NIVEL 5
+  /////////////////////////////////////////////////////
+
+  // Máquina de estados del Nivel 5
+    enum EstadoIngeniero {
+        CALCULANDO_I, PREPARANDO_TERRENO_I, VOLVIENDO_BASE_I, NAVEGANDO_I, LLAMANDO_I, INSTALANDO_I , SINCRONIZANDO_I, TERRAFORMANDO_I , ESPERANDO_TECNICO_I
+    };
+    EstadoIngeniero estado_ing = CALCULANDO_I;
+  int paso_idx_ing = 1; // 0 es la propia Belkanita
+
+  // ¡NUEVO! Memoria para caminar físicamente
+  std::list<Action> plan_navegacion; 
+
+  // Estructuras para el A* de movimiento
+  struct estadoNav {
+      int f; int c; int rumbo;
+      bool operator<(const estadoNav& o) const {
+          if (f != o.f) return f < o.f;
+          if (c != o.c) return c < o.c;
+          return rumbo < o.rumbo;
+      }
+  };
+
+  struct nodoNav {
+      estadoNav st;
+      std::list<Action> secuencia;
+      int g; int h;
+      int f_val() const { return g + h; }
+      bool operator<(const nodoNav& o) const { return f_val() > o.f_val(); }
+  };
+
+  // Función de navegación segura
+  std::list<Action> a_estrella_navegacion(int orig_f, int orig_c, int orig_rumbo, int dest_f, int dest_c, bool zap);
+
 };
 
 #endif
